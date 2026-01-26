@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress LAB (Next Level)</title>
+<title>ORCA WebScan – Hybrid LAB</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body{margin:0;font-family:system-ui;background:#0b1220;color:#e9efff}
@@ -13,16 +13,15 @@ input{width:70%}
 button{background:#4f7cff;color:#fff;cursor:pointer}
 pre{background:#0a1020;padding:14px;border-radius:10px;overflow:auto;white-space:pre-wrap}
 h1{margin-top:0}
-.badge{padding:4px 8px;border-radius:6px;font-size:12px}
+.tag{font-size:12px;padding:3px 6px;border-radius:6px}
 .ok{background:#0a6}
 .warn{background:#a80}
-.err{background:#a00}
 </style>
 </head>
 <body>
 
 <div class="container">
-<h1>🛡️ ORCA WebScan – WordPress LAB (Next Level)</h1>
+<h1>🛡️ ORCA WebScan – Hybrid WordPress LAB</h1>
 
 <div class="card">
 <input id="target" placeholder="example.com">
@@ -35,129 +34,86 @@ h1{margin-top:0}
 </div>
 
 <script>
-// ================== OFFLINE CVE DB ==================
+// ================= CONFIG =================
+const PROXY = "https://r.jina.ai/http://";
+
+// ================= OFFLINE CVE DB =================
 const CVE_DB = {
-  core:{
-    "6.2":["CVE-2023-2745"],
-    "5.9":["CVE-2022-21661"]
-  },
   plugins:{
     "contact-form-7":["CVE-2020-35489"],
-    "elementor":["CVE-2023-48777"],
-    "woocommerce":["CVE-2021-32790"]
-  },
-  themes:{
-    "twentytwentyone":["CVE-2021-39200"]
+    "elementor":["CVE-2023-48777"]
   }
 };
 
-// ================== HELPERS ==================
+// ================= HELPERS =================
 const clean = d=>d.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 const out = t=>document.getElementById("out").textContent=t;
 
-async function safeFetch(url){
-  try{ return await fetch(url); }catch{ return null; }
+async function hybridFetch(url){
+  try{
+    return {res: await fetch(url), mode:"direct"};
+  }catch{
+    try{
+      return {res: await fetch(PROXY + url.replace(/^https?:\/\//,'')), mode:"proxy"};
+    }catch{
+      return null;
+    }
+  }
 }
 
-// ================== MAIN SCAN ==================
+// ================= MAIN SCAN =================
 async function scan(){
   const domain = clean(target.value.trim());
   if(!domain) return;
-  out("Scanning...");
 
+  out("Scanning...");
   let log=`Target\n------\n${domain}\n\n`;
 
-  const base = "https://" + domain;
-  const res = await safeFetch(base);
-  if(!res){ out("Failed to connect."); return; }
+  const base="https://"+domain;
+  const h = await hybridFetch(base);
+  if(!h){ out("Target unreachable."); return; }
 
-  const html = await res.text();
-  const headers = {};
-  res.headers.forEach((v,k)=>headers[k]=v);
+  const html = await h.res.text();
+  log+=`Fetch Mode\n----------\n${h.mode==="proxy"?"Proxy (CORS-safe)":"Direct"}\n\n`;
 
-  // ===== WordPress detect =====
-  const isWP = /wp-content|wp-includes/i.test(html);
+  // WordPress detect
+  const isWP=/wp-content|wp-includes/i.test(html);
   log+=`WordPress Detected\n------------------\n${isWP?"YES":"NO"}\n\n`;
 
-  // ===== Version detect =====
-  let version="Not provided";
-  const v = html.match(/generator.+wordpress\s([0-9.]+)/i);
-  if(v) version=v[1];
-  log+=`WordPress Version\n----------------\n${version}\n\n`;
-
-  // ===== Admin login =====
+  // Admin paths
   log+="Admin Login Paths\n-----------------\n";
   for(const p of ["/wp-login.php","/wp-admin/"]){
-    const r = await safeFetch(base+p);
-    log+=`${p} => ${r?r.status:"blocked"}\n`;
+    const r=await hybridFetch(base+p);
+    log+=`${p} => ${r?r.res.status:"blocked"}\n`;
   }
 
-  // ===== xmlrpc =====
-  log+="\nXML-RPC Check\n-------------\n";
-  const xr = await safeFetch(base+"/xmlrpc.php");
-  log+=xr?`xmlrpc.php => ${xr.status}\n`:"xmlrpc blocked\n";
+  // xmlrpc
+  const xr=await hybridFetch(base+"/xmlrpc.php");
+  log+=`\nXML-RPC\n-------\n${xr?xr.res.status:"blocked"}\n`;
 
-  // ===== wp-json mapper =====
-  log+="\nwp-json Endpoint Mapper\n----------------------\n";
-  const endpoints=[
-    "/wp-json/","/wp-json/wp/v2/users",
-    "/wp-json/wp/v2/posts",
-    "/wp-json/wp/v2/pages"
-  ];
-  for(const e of endpoints){
-    const r = await safeFetch(base+e);
-    log+=`${e} => ${r?r.status:"blocked"}\n`;
+  // wp-json
+  log+="\nwp-json Mapper\n--------------\n";
+  for(const e of ["/wp-json/","/wp-json/wp/v2/users"]){
+    const r=await hybridFetch(base+e);
+    log+=`${e} => ${r?r.res.status:"blocked"}\n`;
   }
 
-  // ===== Passive user enum =====
-  log+="\nPassive User Enumeration\n------------------------\n";
-  const u = await safeFetch(base+"/?author=1");
-  log+=u && u.url.includes("/author/") ? "Author archive exposed\n" : "Author enum protected\n";
-
-  // ===== Plugin detect =====
+  // Plugin detect
   const plugins=[...new Set(
-    [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)]
-    .map(m=>m[1])
+    [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)].map(m=>m[1])
   )];
-  log+="\nPlugins Detected\n----------------\n";
+  log+="\nPlugins\n-------\n";
   log+=plugins.length?plugins.join(", ")+"\n":"None\n";
 
-  // ===== Theme detect =====
-  let theme="Unknown";
-  const t = html.match(/wp-content\/themes\/([a-z0-9-_]+)/i);
-  if(t) theme=t[1];
-  log+=`\nTheme Detected\n--------------\n${theme}\n`;
-
-  // ===== Security headers =====
-  const secHeaders=[
-    "content-security-policy",
-    "strict-transport-security",
-    "x-frame-options",
-    "x-content-type-options",
-    "referrer-policy"
-  ];
-  let score=0;
-  log+="\nSecurity Headers\n----------------\n";
-  secHeaders.forEach(h=>{
-    if(headers[h]){ log+=`${h}: present\n`; score+=10; }
-    else log+=`${h}: missing\n`;
-  });
-  log+=`\nHeader Score: ${score}/50\n`;
-
-  // ===== CVE match =====
-  log+="\n[ Core CVE Match ]\n-----------------\n";
-  log+=CVE_DB.core[version]?.join(", ")||"None";
-  log+="\n\n[ Plugin CVE Match ]\n-------------------\n";
-  let pc=[];
+  // CVE match
+  log+="\nPlugin CVE Match\n----------------\n";
+  let c=[];
   plugins.forEach(p=>{
-    if(CVE_DB.plugins[p]) pc.push(`${p}: ${CVE_DB.plugins[p].join(", ")}`);
+    if(CVE_DB.plugins[p]) c.push(`${p}: ${CVE_DB.plugins[p].join(", ")}`);
   });
-  log+=pc.length?pc.join("\n"):"None";
-  log+="\n\n[ Theme CVE Match ]\n------------------\n";
-  log+=CVE_DB.themes[theme]?.join(", ")||"None";
+  log+=c.length?c.join("\n"):"None";
 
-  log+="\n\nScan Mode\n---------\nPassive LAB Scan (No Exploit)\n";
-
+  log+="\n\nScan Mode\n---------\nHybrid Passive LAB Scan\n";
   out(log);
 }
 </script>
