@@ -61,7 +61,7 @@ pre{
   padding:16px;
   border-radius:12px;
   white-space:pre-wrap;
-  line-height:1.4;
+  line-height:1.45;
 }
 </style>
 </head>
@@ -85,26 +85,28 @@ pre{
 </div>
 
 <script>
-/* ================= CORE LOG ================= */
+/* ================= CORE ================= */
+const out=document.getElementById("out");
+const target=document.getElementById("target");
 const log=[];
 const add=t=>log.push(t);
 const render=()=>out.textContent=log.join("\n");
 const clear=()=>{log.length=0};
-const out=document.getElementById("out");
-const target=document.getElementById("target");
-target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
 
-/* ================= SAFE FETCH ================= */
+target.addEventListener("keydown",e=>{
+  if(e.key==="Enter") scan();
+});
+
 async function fetchSafe(url){
   try{
     return await fetch(url,{redirect:"manual"});
-  }catch(e){
+  }catch{
     return null;
   }
 }
 
 /* ================= CMS DETECTION ================= */
-function detectCMS(html, headers){
+function detectCMS(html){
   if(/wp-content|wp-includes|wp-emoji-release/i.test(html)) return "WordPress";
   if(/Joomla!|\/components\/com_/i.test(html)) return "Joomla";
   if(/Drupal|drupal-settings-json/i.test(html)) return "Drupal";
@@ -123,7 +125,11 @@ async function scan(){
   render();
 
   const res=await fetchSafe(base);
-  if(!res){ add("Target unreachable"); render(); return; }
+  if(!res){
+    add("Target unreachable");
+    render();
+    return;
+  }
 
   const html=await res.text();
 
@@ -135,17 +141,16 @@ async function scan(){
   add("");
 
   /* CMS */
-  const cms=detectCMS(html,res.headers);
+  const cms=detectCMS(html);
   add("CMS Detection");
   add("-------------");
   add(cms+"\n");
 
-  /* WORDPRESS CHECK */
   if(cms!=="WordPress"){
     add("WordPress");
     add("----------");
     add("NO");
-    add("\nWP modules skipped");
+    add("\nWordPress modules skipped");
     render();
     return;
   }
@@ -155,7 +160,8 @@ async function scan(){
   add("YES\n");
 
   await enumUsers(base);
-  await pluginFingerprint(html);
+  pluginFingerprint(html);
+  rceIndicators(html);
 
   add("\nScan completed.");
   render();
@@ -165,10 +171,8 @@ async function scan(){
 async function enumUsers(base){
   add("User Enumeration");
   add("-----------------");
-
   let found=false;
 
-  /* wp-json */
   const api=await fetchSafe(base+"/wp-json/wp/v2/users");
   if(api){
     if(api.status===200){
@@ -188,7 +192,6 @@ async function enumUsers(base){
     add("wp-json unreachable (CORS / network)");
   }
 
-  /* author enum */
   for(let i=1;i<=5;i++){
     const r=await fetchSafe(base+"/?author="+i);
     if(r && r.url){
@@ -212,7 +215,8 @@ function pluginFingerprint(html){
   const plugins=[
     {name:"elementor", re:/elementor/i},
     {name:"revslider", re:/revslider|slider-revolution/i},
-    {name:"wp-file-manager", re:/wp-file-manager|elfinder/i}
+    {name:"wp-file-manager", re:/wp-file-manager|elfinder/i},
+    {name:"woocommerce", re:/woocommerce/i}
   ];
 
   let hit=false;
@@ -224,9 +228,42 @@ function pluginFingerprint(html){
   });
 
   if(!hit) add("No plugin fingerprint from HTML");
+  add("");
 }
 
-/* ================================================= */
+/* ================= RCE INDICATORS (NON-PAYLOAD) ================= */
+function rceIndicators(html){
+  add("RCE Indicators");
+  add("--------------");
+
+  let score=0;
+
+  if(/admin-ajax\.php/i.test(html)){
+    add("admin-ajax.php exposed");
+    score++;
+  }
+  if(/upload\.php|async-upload\.php/i.test(html)){
+    add("Upload endpoint referenced");
+    score++;
+  }
+  if(/eval\(|base64_decode\(/i.test(html)){
+    add("Dangerous function pattern in client asset");
+    score++;
+  }
+  if(/xmlrpc\.php/i.test(html)){
+    add("XML-RPC endpoint referenced");
+    score++;
+  }
+
+  if(score===0){
+    add("No obvious RCE indicators");
+    add("Likelihood: LOW");
+  }else if(score<=2){
+    add("Likelihood: MEDIUM");
+  }else{
+    add("Likelihood: HIGH");
+  }
+}
 </script>
 </body>
 </html>
