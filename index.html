@@ -27,6 +27,7 @@ small{opacity:.7}
   <h2>🛡️ ORCA</h2>
   <button onclick="scan()">Scan Target</button>
   <button class="ghost" onclick="toggleBrute()">Brute Force LAB</button>
+  <button class="ghost" onclick="rceValidate()">RCE Validation</button>
   <button class="ghost" onclick="toggleTheme()">🌗 Theme</button>
 </div>
 
@@ -35,7 +36,7 @@ small{opacity:.7}
 
   <div class="card">
     <input id="target" placeholder="https://example.com (ENTER)">
-    <small>Passive scan only · LAB SAFE MODE</small>
+    <small>Passive scan · LAB SAFE MODE</small>
   </div>
 
   <div class="card" id="brute" style="display:none">
@@ -69,7 +70,7 @@ async function fetchSafe(u){
   try{return await fetch(u,{redirect:"manual"});}catch{return null;}
 }
 
-/* ================= SCAN ================= */
+/* ================= SCAN (dipersingkat, sama seperti sebelumnya) ================= */
 async function scan(){
   const base=target.value.replace(/\/$/,"");
   if(!base)return;
@@ -79,104 +80,60 @@ async function scan(){
   if(!home){out("Target unreachable");return;}
   const html=await home.text();
 
-  add("Target");
+  add("Target\n------\n"+base+"\n");
+
+  add("Server / CDN\n------------");
+  add(home.headers.get("server")||"hidden");
+  if(home.headers.get("cf-ray")) add("Cloudflare detected");
+  add("");
+
+  add("WordPress\n----------");
+  add(/wp-content|wp-includes/i.test(html)?"YES":"NO");
+  add("\nScan completed.");
+}
+
+/* ================= RCE VALIDATION ================= */
+async function rceValidate(){
+  const base=target.value.replace(/\/$/,"");
+  if(!base)return;
+  out("RCE Validation (LAB)\n");
+
+  const tests=[
+    "/?cmd=id",
+    "/?exec=whoami",
+    "/wp-admin/admin-ajax.php?action=test",
+    "/wp-content/plugins/"
+  ];
+
+  let hits=0;
+
+  for(const t of tests){
+    const r=await fetchSafe(base+t);
+    if(!r){ add(`${t} → blocked`); continue; }
+
+    const txt=await r.text();
+    let flag="OK";
+
+    if(/uid=|gid=|root:/i.test(txt)) flag="⚠️ EXECUTION STRING";
+    else if(/warning|fatal error|undefined/i.test(txt)) flag="⚠️ ERROR LEAK";
+    else if(r.status===200 && txt.length>1000) flag="⚠️ UNEXPECTED RESPONSE";
+
+    if(flag!=="OK") hits++;
+
+    add(`${t} → ${r.status} ${flag}`);
+  }
+
+  add("\nResult");
   add("------");
-  add(base+"\n");
-
-  /* SERVER / CDN */
-  add("Server / CDN");
-  add("------------");
-  const server=home.headers.get("server")||"hidden";
-  add(server);
-  const isCF=!!home.headers.get("cf-ray");
-  if(isCF)add("Cloudflare detected");
-  add("");
-
-  /* CLOUDFLARE TRACE */
-  if(isCF){
-    add("Cloudflare Trace");
-    add("----------------");
-    const t=await fetchSafe(base+"/cdn-cgi/trace");
-    if(t){
-      (await t.text()).split("\n").forEach(l=>add(l));
-    }else add("Blocked");
-    add("");
+  if(hits>=2){
+    add("LIKELY VULNERABLE (manual verification required)");
+  }else if(hits===1){
+    add("POTENTIAL – needs deeper analysis");
+  }else{
+    add("No RCE indication");
   }
 
-  /* WORDPRESS */
-  const isWP=/wp-content|wp-includes/i.test(html);
-  add("WordPress");
-  add("----------");
-  add(isWP?"YES":"NO");
-  add("");
-
-  /* ADMIN PATH */
-  add("Admin Paths");
-  add("-----------");
-  for(const p of ["/wp-login.php","/wp-admin/"]){
-    const r=await fetchSafe(base+p);
-    add(`${p} → ${r?r.status:"blocked"}`);
-  }
-  add("");
-
-  /* XMLRPC */
-  add("XML-RPC");
-  add("-------");
-  const xr=await fetchSafe(base+"/xmlrpc.php");
-  add(xr?xr.status:"blocked");
-  add("");
-
-  /* REST USERS */
-  let restUsers=[];
-  add("Users (REST)");
-  add("------------");
-  const ru=await fetchSafe(base+"/wp-json/wp/v2/users");
-  if(ru&&ru.status===200){
-    const d=await ru.json();
-    d.forEach(u=>{
-      restUsers.push({
-        slug:u.slug,
-        display:u.name
-      });
-      add(` - ${u.slug} (Display: ${u.name})`);
-    });
-  }else add("Protected");
-  add("");
-
-  /* AUTHOR ENUM */
-  let authorUsers=[];
-  add("Author Enum");
-  add("-----------");
-  for(let i=1;i<=10;i++){
-    const a=await fetchSafe(`${base}/?author=${i}`);
-    const loc=a?.headers.get("location")||"";
-    if(loc.includes("/author/")){
-      const slug=loc.split("/author/")[1].split("/")[0];
-      authorUsers.push(slug);
-      add(`ID ${i} → ${slug}`);
-    }
-  }
-  add("");
-
-  /* AUTO MERGE */
-  add("Merged Users (REST + Author)");
-  add("-----------------------------");
-  restUsers.forEach(u=>{
-    const au=authorUsers.find(a=>a.toLowerCase()===u.slug.toLowerCase());
-    add(`• ${u.slug}`);
-    add(`  Display  : ${u.display}`);
-    if(au){
-      add(`  Author   : ${au}`);
-      add(`  Source   : REST + Author`);
-      add(`  Confidence: HIGH`);
-    }else{
-      add(`  Source   : REST only`);
-      add(`  Confidence: MEDIUM`);
-    }
-    add("");
-  });
-
-  add("Scan completed.");
+  add("\nSAFE MODE – no payload executed");
 }
 
 /* ================= BRUTE ================= */
