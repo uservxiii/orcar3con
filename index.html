@@ -251,7 +251,7 @@ pre{
     </div>
 
     <div class="footer">
-      Shortcut: <span class="kbd">Enter</span> to Scan | <span class="kbd">Ctrl+Enter</span> to Run Lab
+      Shortcut: <span class="kbd">Enter</span> to Scan | <span class="kbd">Enter</span> in Lab to Run (Shift+Enter newline)
     </div>
   </div>
 </div>
@@ -274,7 +274,7 @@ let lastReport = null;
 let bruteState = {
   admin: {running:false, index:0, list:[], found:[]},
   sub: {running:false, index:0, list:[], found:[]},
-  dir: {running:false, index:0, list:[], found:[]}
+  dir: {running:false, index:0, list:[], found:[], delay:200}
 };
 
 function pauseBrute(type){
@@ -519,11 +519,14 @@ function formIssues(body){
 }
 
 const adminPaths = [
-  "/wp-admin/", "/administrator/", "/user/login", "/admin", "/login",
-  "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin",
-  "/cpanel", "/manager/html", "/admin/login.php", "/admin/index.php",
-  "/user", "/admin/dashboard", "/admin/home", "/backend", "/adminpanel.php",
-  "/wp-login.php", "/wp-admin.php"
+  "/wp-admin/", "/wp-login.php", "/wp-admin.php",
+  "/administrator/", "/administrator/index.php",
+  "/user/login", "/user/login.php",
+  "/admin", "/admin/login", "/admin/index", "/admin.php",
+  "/admin/login.php", "/adminarea", "/adminpanel", "/adminpanel.php",
+  "/cpanel", "/manager/html", "/backend", "/dashboard",
+  "/admin/dashboard", "/admin/home", "/portal", "/login", "/login.php",
+  "/adminconsole", "/console", "/webadmin", "/siteadmin"
 ];
 
 async function detectAdmin(domain){
@@ -532,7 +535,7 @@ async function detectAdmin(domain){
     try{
       const r = await timeoutFetch(PROXY + "http://" + domain + p, 4000);
       const t = await r.text();
-      if(r.status === 200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password"))){
+      if(r.status === 200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password") || t.toLowerCase().includes("wp-"))){
         found.push(p);
       }
     }catch{}
@@ -697,8 +700,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  document.getElementById("labPayload").addEventListener("keydown", function(e){
-    if(e.key === "Enter" && e.ctrlKey){
+  const labPayload = document.getElementById("labPayload");
+  labPayload.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && !e.shiftKey){
       e.preventDefault();
       labTest();
     }
@@ -739,15 +743,19 @@ async function labTest(){
     return;
   }
 
-  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
-  let res, text;
+  // GET -> inject as param "p"
+  let url = PROXY + "http://" + domain + ep;
+  if(method === "GET"){
+    url += (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
+  }
 
   try{
+    let res, text;
     if(method==="GET"){
       res = await timeoutFetch(url, 8000);
       text = await res.text();
     } else {
-      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
+      res = await timeoutFetch(url, 8000);
       text = await res.text();
     }
 
@@ -781,17 +789,15 @@ async function validateRCE(){
   const token = uniqueToken();
   const payload = `echo ${token}`;
 
-  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
+  let url = PROXY + "http://" + domain + ep;
+  if(method === "GET"){
+    url += (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
+  }
 
   try{
     let res, text;
-    if(method==="GET"){
-      res = await timeoutFetch(url, 8000);
-      text = await res.text();
-    } else {
-      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
-      text = await res.text();
-    }
+    res = await timeoutFetch(url, 8000);
+    text = await res.text();
 
     const ok = text.includes(token);
     document.getElementById("labOut").textContent = `
@@ -816,7 +822,7 @@ async function validateSQLiTimeBased(){
   }
 
   const payload = "' OR SLEEP(5) -- ";
-  const url = PROXY + "http://" + domain + ep + encodeURIComponent(payload);
+  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
 
   const start = performance.now();
   try{
@@ -842,7 +848,7 @@ async function validateXSSReflected(){
   }
 
   const payload = "<svg/onload=alert(1)>";
-  const url = PROXY + "http://" + domain + ep + encodeURIComponent(payload);
+  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
 
   try{
     const res = await timeoutFetch(url, 8000);
@@ -868,7 +874,7 @@ async function validateXSSStored(){
   const url = PROXY + "http://" + domain + ep;
 
   try{
-    const res = await fetch(url, {
+    const res = await timeoutFetch(url, 8000, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: "input=" + encodeURIComponent(token)
@@ -954,6 +960,7 @@ async function dirBrute(resume=false){
     bruteState.dir.delay = parseInt(speed) || 200;
     bruteState.dir.index = 0;
     bruteState.dir.found = [];
+    bruteState.dir.list = [];
   }
 
   bruteState.dir.running = true;
