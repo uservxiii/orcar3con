@@ -39,7 +39,6 @@ small{color:#666}
 
 <script>
 const PROXY="https://r.jina.ai/http://";
-
 const ports=[80,443,8080,8443];
 
 const headersCheck=[
@@ -54,7 +53,6 @@ const headersCheck=[
 function clean(d){
   return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');
 }
-
 function section(t,b){return `\n=== ${t} ===\n${b}\n`; }
 
 async function timeoutFetch(url,ms=8000){
@@ -132,12 +130,96 @@ async function scanPorts(domain){
   return res;
 }
 
+/* ---------- WAF DETECTION ---------- */
+function detectWAF(headers, body){
+  const waf=[];
+  const h=k=>(headers.get(k)||"").toLowerCase();
+  const b=(body||"").toLowerCase();
+
+  if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
+  if(h("x-sucuri-id")||b.includes("sucuri firewall")) waf.push("Sucuri");
+  if(h("x-akamai-transformed")||h("akamai-ghost")) waf.push("Akamai");
+  if(h("x-incapsula")||b.includes("incapsula")) waf.push("Imperva");
+  if(h("x-waf")||h("x-firewall")) waf.push("Generic WAF");
+
+  let level="None";
+  if(waf.length){
+    level = waf.some(x=>["Cloudflare","Akamai","Imperva"].includes(x)) ? "High" : "Medium";
+  }
+
+  return {vendors:[...new Set(waf)], level};
+}
+
+/* ---------- XSS INDICATORS ---------- */
+function xssIndicators(http){
+  const issues=[];
+  const h=http.headers;
+  const body=http.body||"";
+
+  if(!h.has("content-security-policy"))
+    issues.push("Missing CSP");
+  if(/<script[\s>]/i.test(body))
+    issues.push("Inline <script> present");
+  if(/innerHTML\s*=|document\.write|eval\(/i.test(body))
+    issues.push("DOM XSS sink pattern");
+  if(!h.has("x-xss-protection"))
+    issues.push("X-XSS-Protection missing (legacy)");
+
+  return issues;
+}
+
+/* ---------- SQLi INDICATORS ---------- */
+function sqliIndicators(http){
+  const issues=[];
+  const body=http.body||"";
+
+  const err=[
+    /sql syntax/i,
+    /mysql_fetch|mysqli_/i,
+    /ORA-\d+/i,
+    /ODBC SQL Server/i,
+    /Unclosed quotation mark/i,
+    /SQLite\/JDBC/i
+  ];
+
+  if(err.some(r=>r.test(body)))
+    issues.push("SQL error pattern in response");
+  if(http.url.includes("?"))
+    issues.push("Parameterized endpoint observed");
+
+  return issues;
+}
+
+/* ---------- FORM / CSRF SIGNAL ---------- */
+function formIssues(body){
+  const issues=[];
+  const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
+  forms.forEach(f=>{
+    if(!/csrf|token/i.test(f[0]))
+      issues.push("Form without CSRF token");
+  });
+  return issues;
+}
+
+/* ---------- OWASP MAPPING ---------- */
+function owaspMap(r){
+  const map=[];
+  if(r.sqli?.length) map.push("A03: Injection (indicator)");
+  if(r.xss?.length) map.push("A03: Injection (XSS indicator)");
+  if(r.headers?.some(h=>!h.ok)) map.push("A05: Security Misconfiguration");
+  if(r.forms?.length) map.push("A08: CSRF (signal)");
+  return [...new Set(map)];
+}
+
 /* ---------- RISK ---------- */
 function risk(r){
   let s=0;
   if(!r.http.https) s+=20;
   if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
   if(r.tech.includes("WordPress")) s+=5;
+  if(r.waf.level==="High") s+=10;
+  if(r.xss.length) s+=10;
+  if(r.sqli.length) s+=10;
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
@@ -158,6 +240,14 @@ async function run(){
     r.dns=await scanDNS(domain);
     r.subdomains=await subdomains(domain);
     r.ports=await scanPorts(domain);
+
+    // NEW FEATURES
+    r.waf = detectWAF(r.http.headers, r.http.body);
+    r.xss = xssIndicators(r.http);
+    r.sqli = sqliIndicators(r.http);
+    r.forms = formIssues(r.http.body);
+    r.owasp = owaspMap(r);
+
     r.risk=risk(r);
   }catch(e){
     out.textContent="Scan failed.";
@@ -170,6 +260,13 @@ async function run(){
   txt+=section("Security Headers",
     r.headers.map(h=>`${h.name}: ${h.ok?"OK":"MISSING"}`).join("\n")
   );
+  txt+=section("WAF",
+    `Detected: ${r.waf.vendors.join(", ")||"None"}\nProtection: ${r.waf.level}`
+  );
+  txt+=section("XSS Indicators", r.xss.join("\n")||"None");
+  txt+=section("SQLi Indicators", r.sqli.join("\n")||"None");
+  txt+=section("Form Issues", r.forms.join("\n")||"None");
+  txt+=section("OWASP Mapping", r.owasp.join("\n")||"None");
   txt+=section("DNS",
     Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")}`).join("\n")
   );
