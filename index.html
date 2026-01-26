@@ -3,39 +3,166 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan</title>
+<title>ORCA WebScan (Lab Mode)</title>
 <style>
 :root{
-  --navy:#0b1d3a;--white:#fff;--gray:#f4f6fb;
-  --border:#e0e6f2;--ok:#0a6;--warn:#a80;--err:#a00;
+  --navy:#0b1d3a;
+  --white:#fff;
+  --gray:#f4f6fb;
+  --border:#e0e6f2;
+  --ok:#0a6;
+  --warn:#a80;
+  --err:#a00;
+  --shadow: 0 8px 24px rgba(0,0,0,0.08);
 }
-body{margin:0;font-family:system-ui;background:var(--gray)}
-.container{max-width:980px;margin:auto;padding:20px}
-.card{background:#fff;border-radius:14px;padding:20px;border:1px solid var(--border)}
-h1{text-align:center;color:var(--navy)}
-input,button,textarea,select{padding:12px;font-size:16px;border-radius:10px;border:1px solid var(--border);width:100%;box-sizing:border-box}
-button{background:var(--navy);color:#fff;cursor:pointer}
-pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
-.badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px;margin-left:6px}
-.ok{background:#d4f8e8;color:var(--ok)}
-.warn{background:#fff4cc;color:var(--warn)}
-.err{background:#ffd6d6;color:var(--err)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.section{border:1px solid var(--border);padding:12px;border-radius:12px;background:#fff}
-.section h2{margin:0 0 8px 0;font-size:16px;color:var(--navy)}
-.small{color:#666;font-size:13px}
-.progress{height:10px;background:#e9edf7;border-radius:6px;overflow:hidden;margin:10px 0}
-.progress > div{height:100%;width:0;background:var(--navy)}
+[data-theme="dark"]{
+  --navy:#e9efff;
+  --white:#0b1220;
+  --gray:#0a1020;
+  --border:#1b2436;
+  --shadow: 0 10px 26px rgba(0,0,0,0.4);
+}
+body{
+  margin:0;
+  font-family:system-ui;
+  background: linear-gradient(180deg, #f7f9ff 0%, #f4f6fb 100%);
+}
+[data-theme="dark"] body{
+  background: linear-gradient(180deg, #0a0f1f 0%, #0a1020 100%);
+}
+.container{
+  max-width:1000px;
+  margin:auto;
+  padding:20px;
+}
+.card{
+  background:var(--white);
+  border-radius:18px;
+  padding:20px;
+  border:1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+h1{
+  text-align:center;
+  color:var(--navy);
+  margin:0 0 14px 0;
+}
+.row{
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+input,button,textarea,select{
+  padding:12px;
+  font-size:16px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  width:100%;
+  box-sizing:border-box;
+  background:var(--white);
+  color:var(--navy);
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select{
+  background:#121a2c;
+  color:#e9efff;
+}
+button{
+  background:var(--navy);
+  color:#fff;
+  cursor:pointer;
+  transition: transform .1s ease;
+}
+button:hover{ transform: translateY(-1px); }
+button:active{ transform: translateY(0px); }
+pre{
+  background:#f7f9ff;
+  padding:15px;
+  border-radius:12px;
+  overflow:auto;
+  white-space:pre-wrap;
+  color:var(--navy);
+}
+[data-theme="dark"] pre{
+  background:#0f172a;
+  color:#e9efff;
+}
+.badge{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:8px;
+  font-size:12px;
+  margin-left:6px;
+}
+.ok{ background:#d4f8e8; color:var(--ok); }
+.warn{ background:#fff4cc; color:var(--warn); }
+.err{ background:#ffd6d6; color:var(--err); }
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+.section{
+  border:1px solid var(--border);
+  padding:14px;
+  border-radius:14px;
+  background:var(--white);
+}
+[data-theme="dark"] .section{
+  background:#0f172a;
+  border-color:#1b2436;
+}
+.section h2{
+  margin:0 0 10px 0;
+  font-size:16px;
+  color:var(--navy);
+}
+.small{ color:#666; font-size:13px; }
+.progress{
+  height:10px;
+  background:#e9edf7;
+  border-radius:8px;
+  overflow:hidden;
+  margin:10px 0 14px 0;
+}
+.progress > div{
+  height:100%;
+  width:0;
+  background:var(--navy);
+}
+.footer{
+  margin-top:14px;
+  font-size:13px;
+  color:#666;
+  text-align:center;
+}
+[data-theme="dark"] .footer{ color:#b8c3d7; }
+.kbd{
+  display:inline-block;
+  padding:2px 6px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#f0f2ff;
+  font-size:12px;
+}
+[data-theme="dark"] .kbd{ background:#1b2436; }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>ORCA WebScan </h1>
-  <div class="card">
-    <p><small class="small">⚠️ Only scan targets you own or have explicit permission to test. Lab mode is for your own environment.</small></p>
 
-    <input id="target" placeholder="domain.com" autofocus>
-    <button id="btn" onclick="run()">Scan</button>
+<div class="container">
+  <h1>ORCA WebScan (Lab Mode)</h1>
+
+  <div class="card">
+    <p class="small">⚠️ Only scan targets you own or have explicit permission to test. Lab mode is for your own environment.</p>
+
+    <div class="row">
+      <input id="target" placeholder="domain.com" autofocus>
+      <button id="btn" onclick="run()">Scan</button>
+      <button onclick="toggleTheme()">Theme</button>
+      <button onclick="exportReport()">Export JSON</button>
+    </div>
 
     <div class="progress"><div id="bar"></div></div>
 
@@ -46,6 +173,7 @@ pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
 
     <div class="section" style="margin-top:16px;">
       <h2>Lab Mode: Verify Exploit (Your Payload)</h2>
+
       <label>Endpoint (relative or absolute):</label>
       <input id="labEndpoint" placeholder="/vulnerable?cmd=">
 
@@ -58,10 +186,23 @@ pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
       <label>Payload (you provide):</label>
       <textarea id="labPayload" rows="3" placeholder="e.g. id, ls, whoami, etc"></textarea>
 
-      <button onclick="labTest()">Run Lab Test</button>
+      <div class="row" style="margin-top:10px;">
+        <button onclick="labTest()">Run Lab Test</button>
+        <button onclick="validateRCE()">Validate RCE</button>
+      </div>
+
       <pre id="labOut"></pre>
     </div>
 
+    <div class="section" style="margin-top:16px;">
+      <h2>Scan History</h2>
+      <pre id="historyOut">No history yet.</pre>
+      <button onclick="clearHistory()">Clear History</button>
+    </div>
+
+    <div class="footer">
+      Shortcut: <span class="kbd">Enter</span> to Scan | <span class="kbd">Ctrl+Enter</span> to run Lab Test
+    </div>
   </div>
 </div>
 
@@ -77,6 +218,9 @@ const headersCheck=[
   "permissions-policy"
 ];
 
+let lastReport = null;
+
+/* ----------------- HELPERS ----------------- */
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
 function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
 function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
@@ -88,7 +232,36 @@ async function timeoutFetch(url,ms=8000){
   return fetch(url,{signal:c.signal});
 }
 
-/* ---------- HTTP ---------- */
+/* ----------------- THEME ----------------- */
+function toggleTheme(){
+  const root = document.documentElement;
+  const t = root.getAttribute("data-theme");
+  root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
+}
+
+/* ----------------- STORAGE ----------------- */
+function saveHistory(report){
+  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
+  h.unshift({time:new Date().toISOString(), report});
+  localStorage.setItem("orca_history", JSON.stringify(h.slice(0, 20)));
+  renderHistory();
+}
+
+function renderHistory(){
+  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
+  if(!h.length){
+    document.getElementById("historyOut").textContent="No history yet.";
+    return;
+  }
+  document.getElementById("historyOut").textContent = h.map(x=>`${x.time}\n${JSON.stringify(x.report, null, 2)}`).join("\n\n");
+}
+
+function clearHistory(){
+  localStorage.removeItem("orca_history");
+  renderHistory();
+}
+
+/* ----------------- SCAN FUNCTIONS ----------------- */
 async function scanHTTP(domain){
   const r=await timeoutFetch(PROXY+"http://"+domain);
   const text=await r.text();
@@ -101,28 +274,39 @@ async function scanHTTP(domain){
   };
 }
 
-/* ---------- TECH ---------- */
 function techFingerprint(http){
   const tech=[];
   const body=http.body||"";
   const server=http.headers.get("server")||"";
 
-  if(/wp-content|wp-includes/i.test(body)) tech.push("WordPress");
-  if(/Joomla!/i.test(body)) tech.push("Joomla");
-  if(/drupal/i.test(body)) tech.push("Drupal");
-  if(server.includes("nginx")) tech.push("Nginx");
-  if(server.includes("apache")) tech.push("Apache");
-  if(server.includes("cloudflare")) tech.push("Cloudflare");
+  const patterns = [
+    ["WordPress", /wp-content|wp-includes/i],
+    ["Joomla", /Joomla!/i],
+    ["Drupal", /drupal/i],
+    ["Magento", /Magento/i],
+    ["Shopify", /shopify/i],
+    ["Laravel", /laravel/i],
+    ["Express", /express/i],
+    ["Django", /django/i],
+    ["Ruby on Rails", /rails/i],
+    ["Next.js", /next\.js/i],
+    ["React", /react/i],
+    ["Angular", /angular/i]
+  ];
+
+  patterns.forEach(p=>{
+    if(p[1].test(body) || server.toLowerCase().includes(p[0].toLowerCase())){
+      tech.push(p[0]);
+    }
+  });
 
   return [...new Set(tech)];
 }
 
-/* ---------- HEADERS ---------- */
 function scanHeaders(h){
   return headersCheck.map(x=>({name:x,ok:h.has(x)}));
 }
 
-/* ---------- DNS ---------- */
 async function scanDNS(domain){
   const types=["A","AAAA","MX","NS","TXT"];
   let out={};
@@ -136,25 +320,30 @@ async function scanDNS(domain){
   return out;
 }
 
-/* ---------- SUBDOMAIN (CRT.SH + fallback) ---------- */
 async function subdomains(domain){
   let list=[];
+
+  // CRT.SH
   try{
     const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
     const j=await r.json();
     list = [...new Set(j.map(x=>x.name_value))];
-  }catch(e){
-    list=[];
-  }
+  }catch{}
+
+  // DNS A fallback
   try{
     const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
     const j=await r.json();
     if(j.Answer) list.push(domain);
   }catch{}
-  return [...new Set(list)].slice(0,30);
+
+  // common list (safe)
+  const common = ["www","mail","api","dev","staging","test","admin","portal","blog","shop"];
+  common.forEach(s=>list.push(`${s}.${domain}`));
+
+  return [...new Set(list)].slice(0,40);
 }
 
-/* ---------- PORT CHECK (browser-limited) ---------- */
 async function scanPorts(domain){
   let res={};
   for(const p of ports){
@@ -166,7 +355,6 @@ async function scanPorts(domain){
   return res;
 }
 
-/* ---------- WAF DETECTION ---------- */
 function detectWAF(headers, body){
   const waf=[];
   const h=k=>(headers.get(k)||"").toLowerCase();
@@ -185,7 +373,6 @@ function detectWAF(headers, body){
   return {vendors:[...new Set(waf)], level};
 }
 
-/* ---------- XSS INDICATORS ---------- */
 function xssIndicators(http){
   const issues=[];
   const h=http.headers;
@@ -203,7 +390,6 @@ function xssIndicators(http){
   return issues;
 }
 
-/* ---------- SQLi INDICATORS ---------- */
 function sqliIndicators(http){
   const issues=[];
   const body=http.body||"";
@@ -214,18 +400,25 @@ function sqliIndicators(http){
     /ORA-\d+/i,
     /ODBC SQL Server/i,
     /Unclosed quotation mark/i,
-    /SQLite\/JDBC/i
+    /SQLite\/JDBC/i,
+    /syntax error at or near/i
   ];
 
   if(err.some(r=>r.test(body)))
     issues.push("SQL error pattern in response");
-  if(http.url.includes("?"))
-    issues.push("Parameterized endpoint observed");
+
+  // detect suspicious query params
+  const url = http.url || "";
+  const hasParams = url.includes("?");
+  if(hasParams){
+    const params = url.split("?")[1];
+    if(/('|%27|--|;|or%20|and%20)/i.test(params))
+      issues.push("Suspicious SQL chars in URL parameters");
+  }
 
   return issues;
 }
 
-/* ---------- RCE INDICATORS (passive) ---------- */
 function rceIndicators(http){
   const issues=[];
   const body=http.body||"";
@@ -249,7 +442,6 @@ function rceIndicators(http){
   return issues;
 }
 
-/* ---------- FORM / CSRF SIGNAL ---------- */
 function formIssues(body){
   const issues=[];
   const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
@@ -260,10 +452,11 @@ function formIssues(body){
   return issues;
 }
 
-/* ---------- ADMIN LOGIN DETECTION ---------- */
 const adminPaths = [
   "/wp-admin/", "/administrator/", "/user/login", "/admin", "/login",
-  "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin"
+  "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin",
+  "/cpanel", "/manager/html", "/admin/login.php", "/admin/index.php",
+  "/user", "/admin/dashboard", "/admin/home", "/backend", "/adminpanel.php"
 ];
 
 async function detectAdmin(domain){
@@ -280,7 +473,6 @@ async function detectAdmin(domain){
   return [...new Set(found)];
 }
 
-/* ---------- OWASP MAPPING ---------- */
 function owaspMap(r){
   const map=[];
   if(r.sqli?.length) map.push("A03: Injection (indicator)");
@@ -291,7 +483,6 @@ function owaspMap(r){
   return [...new Set(map)];
 }
 
-/* ---------- RISK ---------- */
 function risk(r){
   let s=0;
   if(!r.http.https) s+=20;
@@ -304,7 +495,7 @@ function risk(r){
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
-/* ---------- RUN ---------- */
+/* ----------------- RUN ----------------- */
 async function run(){
   const out=document.getElementById("output");
   const det=document.getElementById("details");
@@ -346,6 +537,10 @@ async function run(){
 
     r.risk=risk(r);
     setProgress(100);
+
+    lastReport = r;
+    saveHistory(r);
+
   }catch(e){
     out.innerHTML = "<b>Scan failed.</b><br><span class='small'>Possible CORS / Proxy limit.</span>";
     setProgress(0);
@@ -383,12 +578,44 @@ async function run(){
   `;
 }
 
-/* Enter key */
-document.getElementById("target").addEventListener("keydown", function(e){
-  if(e.key === "Enter") run();
+/* ----------------- ENTER FIX ----------------- */
+document.addEventListener("DOMContentLoaded", () => {
+  const target = document.getElementById("target");
+  target.focus();
+
+  target.addEventListener("keydown", function(e){
+    if(e.key === "Enter"){
+      e.preventDefault();
+      run();
+    }
+  });
+
+  document.getElementById("labPayload").addEventListener("keydown", function(e){
+    if(e.key === "Enter" && e.ctrlKey){
+      e.preventDefault();
+      labTest();
+    }
+  });
+
+  renderHistory();
 });
 
-/* ---------- LAB TEST ---------- */
+/* ----------------- EXPORT ----------------- */
+function exportReport(){
+  if(!lastReport){
+    alert("No report to export yet.");
+    return;
+  }
+  const blob = new Blob([JSON.stringify(lastReport, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "orca_report.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ----------------- LAB ----------------- */
 async function labTest(){
   const domain=clean(document.getElementById("target").value);
   if(!domain){
@@ -426,6 +653,49 @@ ${text.slice(0, 500)}
 
   }catch(e){
     document.getElementById("labOut").textContent="Lab request failed (CORS/proxy/timeout).";
+  }
+}
+
+/* ----------------- RCE VALIDATION ----------------- */
+function uniqueToken(){
+  return "ORCA_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
+async function validateRCE(){
+  const domain=clean(document.getElementById("target").value);
+  const ep=document.getElementById("labEndpoint").value.trim();
+  const method=document.getElementById("labMethod").value;
+
+  if(!domain || !ep){
+    document.getElementById("labOut").textContent="Target + endpoint required for validation.";
+    return;
+  }
+
+  const token = uniqueToken();
+  const payload = `echo ${token}`;
+
+  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
+
+  try{
+    let res, text;
+    if(method==="GET"){
+      res = await timeoutFetch(url, 8000);
+      text = await res.text();
+    } else {
+      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
+      text = await res.text();
+    }
+
+    const ok = text.includes(token);
+    document.getElementById("labOut").textContent = `
+VALIDATION RESULT: ${ok ? "VALID (RCE confirmed)" : "NOT VALID (no output)"}
+Token: ${token}
+Response snippet:
+${text.slice(0, 500)}
+    `.trim();
+
+  }catch(e){
+    document.getElementById("labOut").textContent="Validation failed (CORS/proxy/timeout).";
   }
 }
 </script>
