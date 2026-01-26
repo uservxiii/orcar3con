@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -269,45 +269,31 @@ const headersCheck=[
 ];
 
 let lastReport = null;
-
-/* ----------------- PAUSE/RESUME CONTROLS ----------------- */
 let bruteState = {
-  admin: {running:false, index:0, list:[], found:[]},
-  sub: {running:false, index:0, list:[], found:[]},
-  dir: {running:false, index:0, list:[], found:[]}
+  admin: {running:false, index:0, list:[], found:[], delay:200},
+  sub: {running:false, index:0, list:[], found:[], delay:200},
+  dir: {running:false, index:0, list:[], found:[], delay:200}
 };
-
-function pauseBrute(type){
-  bruteState[type].running=false;
-}
-function resumeBrute(type){
-  bruteState[type].running=true;
-  if(type==="admin") adminBrute(true);
-  if(type==="sub") subdomainBrute(true);
-  if(type==="dir") dirBrute(true);
-}
 
 /* ----------------- HELPERS ----------------- */
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
 function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
-
-// **SAFE HTML ESCAPE**
-function escapeHTML(s){
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function badge(txt,cls){ return `<span class="badge ${cls}">${escapeHTML(txt)}</span>`; }
-function section(title,html){ return `<h2>${escapeHTML(title)}</h2>${html}`; }
+function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
+function section(title,html){ return `<h2>${title}</h2>${html}`; }
 
 async function timeoutFetch(url,ms=8000){
   const c=new AbortController();
   setTimeout(()=>c.abort(),ms);
   return fetch(url,{signal:c.signal});
+}
+
+function buildUrl(domain, ep, payload, method){
+  const base = PROXY + "http://" + domain;
+  if(method === "GET"){
+    const separator = ep.includes("?") ? "&" : "?";
+    return base + ep + separator + encodeURIComponent(payload);
+  }
+  return base + ep;
 }
 
 /* ----------------- THEME ----------------- */
@@ -343,10 +329,14 @@ function clearHistory(){
 async function scanHTTP(domain){
   const r=await timeoutFetch(PROXY+"http://"+domain);
   const text=await r.text();
+
+  let headersObj = {};
+  r.headers.forEach((v,k)=> headersObj[k]=v);
+
   return {
     status:r.status,
     url:r.url,
-    headers:r.headers,
+    headers:headersObj,
     body:text,
     https:r.url.startsWith("https")
   };
@@ -355,7 +345,7 @@ async function scanHTTP(domain){
 function techFingerprint(http){
   const tech=[];
   const body=http.body||"";
-  const server=http.headers.get("server")||"";
+  const server=http.headers["server"]||"";
 
   const patterns = [
     ["WordPress", /wp-content|wp-includes/i],
@@ -382,7 +372,7 @@ function techFingerprint(http){
 }
 
 function scanHeaders(h){
-  return headersCheck.map(x=>({name:x,ok:h.has(x)}));
+  return headersCheck.map(x=>({name:x,ok:!!h[x]}));
 }
 
 async function scanDNS(domain){
@@ -405,7 +395,7 @@ async function subdomains(domain){
   try{
     const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
     const j=await r.json();
-    list = [...new Set(j.map(x=>x.name_value))];
+    list = [...new Set(j.map(x=>x.name_value))].slice(0,30);
   }catch{}
 
   // DNS A fallback
@@ -415,7 +405,6 @@ async function subdomains(domain){
     if(j.Answer) list.push(domain);
   }catch{}
 
-  // common list (safe)
   const common = ["www","mail","api","dev","staging","test","admin","portal","blog","shop"];
   common.forEach(s=>list.push(`${s}.${domain}`));
 
@@ -435,7 +424,7 @@ async function scanPorts(domain){
 
 function detectWAF(headers, body){
   const waf=[];
-  const h=k=>(headers.get(k)||"").toLowerCase();
+  const h=k=> (headers[k]||"").toLowerCase();
   const b=(body||"").toLowerCase();
 
   if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
@@ -456,13 +445,13 @@ function xssIndicators(http){
   const h=http.headers;
   const body=http.body||"";
 
-  if(!h.has("content-security-policy"))
+  if(!h["content-security-policy"])
     issues.push("Missing CSP");
   if(/<script[\s>]/i.test(body))
     issues.push("Inline <script> present");
   if(/innerHTML\s*=|document\.write|eval\(/i.test(body))
     issues.push("DOM XSS sink pattern");
-  if(!h.has("x-xss-protection"))
+  if(!h["x-xss-protection"])
     issues.push("X-XSS-Protection missing (legacy)");
 
   return issues;
@@ -551,7 +540,6 @@ async function detectAdmin(domain){
   return [...new Set(found)];
 }
 
-/* CMS fingerprint more specific */
 async function detectCMSAdmin(domain){
   const checks = [
     {name:"WordPress", path:"/wp-login.php"},
@@ -571,7 +559,6 @@ async function detectCMSAdmin(domain){
   return found;
 }
 
-/* ----------------- VERSION DETECTION ----------------- */
 function detectCMSVersion(body){
   const v=[];
 
@@ -617,7 +604,7 @@ async function run(){
   if(!domain) return;
 
   setProgress(5);
-  out.textContent = "Scanning...";
+  out.innerHTML = "<b>Scanning...</b>";
 
   let r={};
 
@@ -658,42 +645,41 @@ async function run(){
     saveHistory(r);
 
   }catch(e){
-    out.textContent = "Scan failed.\nPossible CORS / Proxy limit.";
+    out.innerHTML = "<b>Scan failed.</b><br><span class='small'>Possible CORS / Proxy limit.</span>";
     setProgress(0);
     return;
   }
 
-  // SAFE OUTPUT (no innerHTML with untrusted data)
   out.innerHTML = `
     ${section("HTTP", `
-      Status: ${escapeHTML(String(r.http.status))} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}<br>
+      Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}<br>
       HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
     `)}
 
-    ${section("Tech", escapeHTML(r.tech.join(", ")||"None"))}
-    ${section("CMS Version", escapeHTML(r.version.join("<br>")||"None"))}
+    ${section("Tech", r.tech.join(", ")||"None")}
+    ${section("CMS Version", r.version.join("<br>")||"None")}
 
-    ${section("Security Headers", r.headers.map(h=>`${escapeHTML(h.name)}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
+    ${section("Security Headers", r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
 
     ${section("WAF", `
-      Detected: ${escapeHTML(r.waf.vendors.join(", ")||"None")}<br>
-      Protection: ${escapeHTML(r.waf.level)}
+      Detected: ${r.waf.vendors.join(", ")||"None"}<br>
+      Protection: ${r.waf.level}
     `)}
 
-    ${section("XSS Indicators", escapeHTML(r.xss.join("<br>")||"None"))}
-    ${section("SQLi Indicators", escapeHTML(r.sqli.join("<br>")||"None"))}
-    ${section("RCE Indicators", escapeHTML(r.rce.join("<br>")||"None"))}
-    ${section("Form Issues", escapeHTML(r.forms.join("<br>")||"None"))}
-    ${section("OWASP Mapping", escapeHTML(r.owasp.join("<br>")||"None"))}
-    ${section("Admin Login Paths", escapeHTML(r.admin.join("<br>")||"None"))}
-    ${section("CMS Admin Fingerprint", escapeHTML(r.cmsAdmin.join("<br>")||"None"))}
+    ${section("XSS Indicators", r.xss.join("<br>")||"None")}
+    ${section("SQLi Indicators", r.sqli.join("<br>")||"None")}
+    ${section("RCE Indicators", r.rce.join("<br>")||"None")}
+    ${section("Form Issues", r.forms.join("<br>")||"None")}
+    ${section("OWASP Mapping", r.owasp.join("<br>")||"None")}
+    ${section("Admin Login Paths", r.admin.join("<br>")||"None")}
+    ${section("CMS Admin Fingerprint", r.cmsAdmin.join("<br>")||"None")}
   `;
 
   det.innerHTML = `
-    ${section("DNS", escapeHTML(Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>")))}
-    ${section("Subdomains", escapeHTML(r.subdomains.join("<br>")||"None"))}
-    ${section("Ports", escapeHTML(Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>")))}
-    ${section("Risk", `Level: ${escapeHTML(r.risk.level)}<br>Score: ${escapeHTML(String(r.risk.score))}`)}
+    ${section("DNS", Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))}
+    ${section("Subdomains", r.subdomains.join("<br>")||"None")}
+    ${section("Ports", Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"))}
+    ${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
   `;
 }
 
@@ -751,18 +737,11 @@ async function labTest(){
     return;
   }
 
-  // FIX: harus ada ? untuk query param
-  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "test=" + encodeURIComponent(payload);
-  let res, text;
+  const url = buildUrl(domain, ep, payload, method);
 
   try{
-    if(method==="GET"){
-      res = await timeoutFetch(url, 8000);
-      text = await res.text();
-    } else {
-      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
-      text = await res.text();
-    }
+    let res = await timeoutFetch(url, 8000);
+    let text = await res.text();
 
     document.getElementById("labOut").textContent = `
 Status: ${res.status}
@@ -794,17 +773,11 @@ async function validateRCE(){
   const token = uniqueToken();
   const payload = `echo ${token}`;
 
-  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "test=" + encodeURIComponent(payload);
+  const url = buildUrl(domain, ep, payload, method);
 
   try{
-    let res, text;
-    if(method==="GET"){
-      res = await timeoutFetch(url, 8000);
-      text = await res.text();
-    } else {
-      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
-      text = await res.text();
-    }
+    let res = await timeoutFetch(url, 8000);
+    let text = await res.text();
 
     const ok = text.includes(token);
     document.getElementById("labOut").textContent = `
@@ -829,7 +802,7 @@ async function validateSQLiTimeBased(){
   }
 
   const payload = "' OR SLEEP(5) -- ";
-  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "test=" + encodeURIComponent(payload);
+  const url = buildUrl(domain, ep, payload, "GET");
 
   const start = performance.now();
   try{
@@ -855,7 +828,7 @@ async function validateXSSReflected(){
   }
 
   const payload = "<svg/onload=alert(1)>";
-  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "test=" + encodeURIComponent(payload);
+  const url = buildUrl(domain, ep, payload, "GET");
 
   try{
     const res = await timeoutFetch(url, 8000);
@@ -1113,12 +1086,6 @@ async function adminBrute(resume=false){
 
 /* ----------------- CSRF TOKEN CHECKER ----------------- */
 function csrfChecker(){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("adminOut").textContent="Target required.";
-    return;
-  }
-
   const body = lastReport?.http?.body || "";
   const forms = [...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
   if(!forms.length){
@@ -1216,7 +1183,17 @@ async function wpPluginThemeDetect(){
     document.getElementById("subOut").textContent="Failed (CORS/proxy/timeout)";
   }
 }
+
+/* ----------------- PAUSE/RESUME CONTROLS ----------------- */
+function pauseBrute(type){
+  bruteState[type].running=false;
+}
+function resumeBrute(type){
+  bruteState[type].running=true;
+  if(type==="admin") adminBrute(true);
+  if(type==="sub") subdomainBrute(true);
+  if(type==="dir") dirBrute(true);
+}
 </script>
-  </body>
-  </html>
-    
+</body>
+</html>
