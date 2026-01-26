@@ -149,35 +149,34 @@ button:hover{
 </div>
 
 <script>
-function normalizeUrl(url){
-    url = url.trim();
-    // remove leading http(s) if already
-    url = url.replace(/^https?:\/\//, "");
-    url = url.replace(/\/+$/, "");
-    return "http://" + url;
-}
-
-// PROXY JINA
 const PROXY = "https://r.jina.ai/http://";
 
-function timeout(ms){
-    return new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms));
+function normalizeDomain(domain){
+    domain = domain.trim().toLowerCase();
+    domain = domain.replace(/^https?:\/\//, "");   // remove http:// or https://
+    domain = domain.replace(/^www\./, "");         // optional remove www
+    domain = domain.replace(/\/+$/, "");           // remove trailing slash
+    return domain;
 }
 
-async function fetchWithTimeout(url, ms=10000){
+function buildProxyUrl(domain){
+    return PROXY + domain;
+}
+
+async function fetchProxy(url){
     try{
-        const res = await Promise.race([fetch(url), timeout(ms)]);
+        const res = await fetch(url);
         const text = await res.text();
         return {ok: res.ok, status: res.status, url: res.url, text};
     }catch(e){
-        return {ok: false, status: null, url: null, text: e.message};
+        return {ok:false, status:null, url:null, text:e.message};
     }
 }
 
 async function dnsLookup(domain){
     const url = `https://dns.google/resolve?name=${domain}&type=A`;
     try{
-        const res = await Promise.race([fetch(PROXY + url), timeout(8000)]);
+        const res = await fetch(PROXY + url);
         const data = await res.json();
         return data;
     }catch(e){
@@ -202,20 +201,20 @@ function detectCMS(body){
     return detected.length ? detected : ["Unknown"];
 }
 
-async function scan(target){
-    const normalized = normalizeUrl(target);
-    const domain = normalized.replace(/^http:\/\//, "");
+async function scan(domain){
+    const clean = normalizeDomain(domain);
+
+    const baseUrl = buildProxyUrl("http://" + clean);
 
     const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
     let template = {};
 
-    const base = await fetchWithTimeout(PROXY + normalized);
-
-    const dns = await dnsLookup(domain);
+    const base = await fetchProxy(baseUrl);
+    const dns = await dnsLookup(clean);
 
     if(!base.ok){
         return {
-            target: normalized,
+            target: clean,
             status: base.status,
             error: base.text,
             dns
@@ -223,16 +222,16 @@ async function scan(target){
     }
 
     for(const p of probes){
-        const res = await fetchWithTimeout(PROXY + normalized + "?test=" + encodeURIComponent(p));
+        const url = buildProxyUrl("http://" + clean + "?test=" + encodeURIComponent(p));
+        const res = await fetchProxy(url);
         template[p] = res.ok ? res.text.includes("49") : false;
     }
 
     const cms = detectCMS(base.text);
 
     return {
-        target: normalized,
+        target: clean,
         status: base.status,
-        final_url: base.url,
         cms,
         template_probe: template,
         dns
