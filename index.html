@@ -251,7 +251,7 @@ pre{
     </div>
 
     <div class="footer">
-      Shortcut: <span class="kbd">Enter</span> to Scan | <span class="kbd">Enter</span> in Lab to Run (Shift+Enter newline)
+      Shortcut: <span class="kbd">Enter</span> to Scan | <span class="kbd">Ctrl+Enter</span> to Run Lab
     </div>
   </div>
 </div>
@@ -270,16 +270,13 @@ const headersCheck=[
 
 let lastReport = null;
 
-/* ----------------- PAUSE/RESUME CONTROLS ----------------- */
 let bruteState = {
-  admin: {running:false, index:0, list:[], found:[]},
-  sub: {running:false, index:0, list:[], found:[]},
+  admin: {running:false, index:0, list:[], found:[], delay:150},
+  sub: {running:false, index:0, list:[], found:[], delay:150},
   dir: {running:false, index:0, list:[], found:[], delay:200}
 };
 
-function pauseBrute(type){
-  bruteState[type].running=false;
-}
+function pauseBrute(type){ bruteState[type].running=false; }
 function resumeBrute(type){
   bruteState[type].running=true;
   if(type==="admin") adminBrute(true);
@@ -287,7 +284,6 @@ function resumeBrute(type){
   if(type==="dir") dirBrute(true);
 }
 
-/* ----------------- HELPERS ----------------- */
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
 function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
 function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
@@ -299,14 +295,12 @@ async function timeoutFetch(url,ms=8000){
   return fetch(url,{signal:c.signal});
 }
 
-/* ----------------- THEME ----------------- */
 function toggleTheme(){
   const root = document.documentElement;
   const t = root.getAttribute("data-theme");
   root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
 }
 
-/* ----------------- STORAGE ----------------- */
 function saveHistory(report){
   const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
   h.unshift({time:new Date().toISOString(), report});
@@ -328,7 +322,6 @@ function clearHistory(){
   renderHistory();
 }
 
-/* ----------------- SCAN FUNCTIONS ----------------- */
 async function scanHTTP(domain){
   const r=await timeoutFetch(PROXY+"http://"+domain);
   const text=await r.text();
@@ -390,21 +383,18 @@ async function scanDNS(domain){
 async function subdomains(domain){
   let list=[];
 
-  // CRT.SH
   try{
     const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
     const j=await r.json();
     list = [...new Set(j.map(x=>x.name_value))];
   }catch{}
 
-  // DNS A fallback
   try{
     const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
     const j=await r.json();
     if(j.Answer) list.push(domain);
   }catch{}
 
-  // common list (safe)
   const common = ["www","mail","api","dev","staging","test","admin","portal","blog","shop"];
   common.forEach(s=>list.push(`${s}.${domain}`));
 
@@ -519,14 +509,11 @@ function formIssues(body){
 }
 
 const adminPaths = [
-  "/wp-admin/", "/wp-login.php", "/wp-admin.php",
-  "/administrator/", "/administrator/index.php",
-  "/user/login", "/user/login.php",
-  "/admin", "/admin/login", "/admin/index", "/admin.php",
-  "/admin/login.php", "/adminarea", "/adminpanel", "/adminpanel.php",
-  "/cpanel", "/manager/html", "/backend", "/dashboard",
-  "/admin/dashboard", "/admin/home", "/portal", "/login", "/login.php",
-  "/adminconsole", "/console", "/webadmin", "/siteadmin"
+  "/wp-admin/", "/administrator/", "/user/login", "/admin", "/login",
+  "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin",
+  "/cpanel", "/manager/html", "/admin/login.php", "/admin/index.php",
+  "/user", "/admin/dashboard", "/admin/home", "/backend", "/adminpanel.php",
+  "/wp-login.php", "/wp-admin.php"
 ];
 
 async function detectAdmin(domain){
@@ -535,7 +522,7 @@ async function detectAdmin(domain){
     try{
       const r = await timeoutFetch(PROXY + "http://" + domain + p, 4000);
       const t = await r.text();
-      if(r.status === 200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password") || t.toLowerCase().includes("wp-"))){
+      if(r.status === 200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password"))){
         found.push(p);
       }
     }catch{}
@@ -543,7 +530,6 @@ async function detectAdmin(domain){
   return [...new Set(found)];
 }
 
-/* CMS fingerprint more specific */
 async function detectCMSAdmin(domain){
   const checks = [
     {name:"WordPress", path:"/wp-login.php"},
@@ -563,7 +549,6 @@ async function detectCMSAdmin(domain){
   return found;
 }
 
-/* ----------------- VERSION DETECTION ----------------- */
 function detectCMSVersion(body){
   const v=[];
 
@@ -601,7 +586,6 @@ function risk(r){
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
-/* ----------------- RUN ----------------- */
 async function run(){
   const out=document.getElementById("output");
   const det=document.getElementById("details");
@@ -688,11 +672,11 @@ async function run(){
   `;
 }
 
-/* ----------------- ENTER FIX ----------------- */
 document.addEventListener("DOMContentLoaded", () => {
   const target = document.getElementById("target");
   target.focus();
 
+  // ENTER = Scan
   target.addEventListener("keydown", function(e){
     if(e.key === "Enter"){
       e.preventDefault();
@@ -700,9 +684,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  const labPayload = document.getElementById("labPayload");
-  labPayload.addEventListener("keydown", function(e){
-    if(e.key === "Enter" && !e.shiftKey){
+  // CTRL+ENTER = Lab Run
+  document.getElementById("labPayload").addEventListener("keydown", function(e){
+    if(e.key === "Enter" && e.ctrlKey){
       e.preventDefault();
       labTest();
     }
@@ -711,7 +695,6 @@ document.addEventListener("DOMContentLoaded", () => {
   renderHistory();
 });
 
-/* ----------------- EXPORT ----------------- */
 function exportReport(){
   if(!lastReport){
     alert("No report to export yet.");
@@ -727,6 +710,10 @@ function exportReport(){
 }
 
 /* ----------------- LAB ----------------- */
+function escapeOutput(text){
+  return text.replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
 async function labTest(){
   const domain=clean(document.getElementById("target").value);
   if(!domain){
@@ -743,19 +730,15 @@ async function labTest(){
     return;
   }
 
-  // GET -> inject as param "p"
-  let url = PROXY + "http://" + domain + ep;
-  if(method === "GET"){
-    url += (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
-  }
+  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
+  let res, text;
 
   try{
-    let res, text;
     if(method==="GET"){
       res = await timeoutFetch(url, 8000);
       text = await res.text();
     } else {
-      res = await timeoutFetch(url, 8000);
+      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
       text = await res.text();
     }
 
@@ -763,7 +746,7 @@ async function labTest(){
 Status: ${res.status}
 URL: ${res.url}
 Response snippet:
-${text.slice(0, 500)}
+${escapeOutput(text.slice(0, 500))}
     `.trim();
 
   }catch(e){
@@ -789,22 +772,24 @@ async function validateRCE(){
   const token = uniqueToken();
   const payload = `echo ${token}`;
 
-  let url = PROXY + "http://" + domain + ep;
-  if(method === "GET"){
-    url += (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
-  }
+  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
 
   try{
     let res, text;
-    res = await timeoutFetch(url, 8000);
-    text = await res.text();
+    if(method==="GET"){
+      res = await timeoutFetch(url, 8000);
+      text = await res.text();
+    } else {
+      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
+      text = await res.text();
+    }
 
     const ok = text.includes(token);
     document.getElementById("labOut").textContent = `
 VALIDATION RESULT: ${ok ? "VALID (RCE confirmed)" : "NOT VALID (no output)"}
 Token: ${token}
 Response snippet:
-${text.slice(0, 500)}
+${escapeOutput(text.slice(0, 500))}
     `.trim();
 
   }catch(e){
@@ -822,7 +807,7 @@ async function validateSQLiTimeBased(){
   }
 
   const payload = "' OR SLEEP(5) -- ";
-  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
+  const url = PROXY + "http://" + domain + ep + encodeURIComponent(payload);
 
   const start = performance.now();
   try{
@@ -848,7 +833,7 @@ async function validateXSSReflected(){
   }
 
   const payload = "<svg/onload=alert(1)>";
-  const url = PROXY + "http://" + domain + ep + (ep.includes("?") ? "&" : "?") + "p=" + encodeURIComponent(payload);
+  const url = PROXY + "http://" + domain + ep + encodeURIComponent(payload);
 
   try{
     const res = await timeoutFetch(url, 8000);
@@ -856,7 +841,7 @@ async function validateXSSReflected(){
     const reflected = text.includes(payload);
 
     document.getElementById("labOut").textContent =
-      `Reflected XSS Test:\nStatus: ${res.status}\nReflected: ${reflected ? "YES" : "NO"}\nResponse snippet:\n${text.slice(0,200)}`;
+      `Reflected XSS Test:\nStatus: ${res.status}\nReflected: ${reflected ? "YES" : "NO"}\nResponse snippet:\n${escapeOutput(text.slice(0,200))}`;
   }catch(e){
     document.getElementById("labOut").textContent="timeout/CORS/proxy";
   }
@@ -875,13 +860,13 @@ async function validateXSSStored(){
 
   try{
     const res = await timeoutFetch(url, 8000, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: "input=" + encodeURIComponent(token)
+      method:"POST",
+      headers:{ "Content-Type":"application/x-www-form-urlencoded" },
+      body:"input="+encodeURIComponent(token)
     });
     const text = await res.text();
     document.getElementById("labOut").textContent =
-      `Stored XSS Test (POST):\nStatus: ${res.status}\nPayload sent.\nResponse snippet:\n${text.slice(0,200)}\n\nNOTE: Stored XSS requires checking later if payload appears in another page.`;
+      `Stored XSS Test (POST):\nStatus: ${res.status}\nPayload sent.\nResponse snippet:\n${escapeOutput(text.slice(0,200))}\n\nNOTE: Stored XSS requires checking later if payload appears in another page.`;
   }catch(e){
     document.getElementById("labOut").textContent="timeout/CORS/proxy";
   }
@@ -960,7 +945,6 @@ async function dirBrute(resume=false){
     bruteState.dir.delay = parseInt(speed) || 200;
     bruteState.dir.index = 0;
     bruteState.dir.found = [];
-    bruteState.dir.list = [];
   }
 
   bruteState.dir.running = true;
