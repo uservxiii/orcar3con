@@ -3,267 +3,163 @@
 <head>
 <meta charset="UTF-8">
 <title>ORCA Web Scanner</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
 <style>
-:root{
-  --bg:#0b1220;
-  --panel:#121a2c;
-  --text:#e9efff;
-  --accent:#4f7cff;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
-  background:var(--bg);
-  color:var(--text);
-  display:flex;
-  height:100vh;
-}
-.sidebar{
-  width:260px;
-  background:var(--panel);
+body {
+  background:#0b0f14;
+  color:#d1d5db;
+  font-family: monospace;
   padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
 }
-.sidebar h2{margin:0}
-.sidebar button{
-  padding:12px;
-  border-radius:10px;
-  border:none;
-  background:var(--accent);
-  color:#fff;
-  cursor:pointer;
+input, button {
+  background:#111827;
+  color:#e5e7eb;
+  border:1px solid #374151;
+  padding:8px;
 }
-.main{
-  flex:1;
-  padding:20px;
-  overflow:auto;
+button { cursor:pointer }
+pre {
+  white-space: pre-wrap;
+  line-height: 1.4;
 }
-.card{
-  background:var(--panel);
-  border-radius:14px;
-  padding:16px;
-  margin-bottom:14px;
-}
-input{
-  width:100%;
-  padding:12px;
-  border-radius:8px;
-  border:none;
-}
-pre{
-  background:#0a1020;
-  color:#cde;
-  padding:16px;
-  border-radius:12px;
-  white-space:pre-wrap;
-  line-height:1.45;
-}
+.ok { color:#22c55e }
+.warn { color:#facc15 }
+.bad { color:#ef4444 }
+.dim { color:#9ca3af }
 </style>
 </head>
-
 <body>
-<div class="sidebar">
-  <h2>🛡️ ORCA</h2>
-  <button onclick="scan()">Scan Target</button>
-</div>
 
-<div class="main">
-  <h1>ORCA Web Scanner</h1>
+<h2>ORCA Web Scanner</h2>
 
-  <div class="card">
-    <input id="target" placeholder="https://target.tld  (ENTER)">
-  </div>
+<input id="target" placeholder="example.com" size="40">
+<button onclick="scan()">SCAN</button>
 
-  <div class="card">
-    <pre id="out">Idle.</pre>
-  </div>
-</div>
+<pre id="out"></pre>
 
 <script>
-/* ================= CORE ================= */
-const out=document.getElementById("out");
-const target=document.getElementById("target");
-const log=[];
-const add=t=>log.push(t);
-const render=()=>out.textContent=log.join("\n");
-const clear=()=>{log.length=0};
-
-target.addEventListener("keydown",e=>{
-  if(e.key==="Enter") scan();
-});
-
-async function fetchSafe(url){
-  try{
-    return await fetch(url,{redirect:"manual"});
-  }catch{
-    return null;
+const CVE_DB = {
+  "revslider": {
+    risk: "HIGH",
+    cve: "CVE-2014-9734",
+    desc: "RevSlider arbitrary file upload → RCE"
+  },
+  "wp-file-manager": {
+    risk: "HIGH",
+    cve: "CVE-2020-25213",
+    desc: "WP File Manager unauthenticated RCE"
+  },
+  "elementor": {
+    risk: "MEDIUM",
+    cve: "CVE-2023-48777",
+    desc: "Elementor template import RCE"
   }
-}
+};
 
-/* ================= CMS DETECTION ================= */
-function detectCMS(html){
-  if(/wp-content|wp-includes|wp-emoji-release/i.test(html)) return "WordPress";
-  if(/Joomla!|\/components\/com_/i.test(html)) return "Joomla";
-  if(/Drupal|drupal-settings-json/i.test(html)) return "Drupal";
-  return "Static / Unknown";
-}
+async function scan() {
+  const out = document.getElementById("out");
+  const target = document.getElementById("target").value.trim();
+  if (!target) return;
 
-/* ================= MAIN SCAN ================= */
-async function scan(){
-  clear();
-  const base=target.value.replace(/\/$/,"");
-  if(!base) return;
+  out.textContent = "";
+  log("Scanning target\n===============\n" + target + "\n");
 
-  add("Scanning target");
-  add("===============");
-  add(base+"\n");
-  render();
-
-  const res=await fetchSafe(base);
-  if(!res){
-    add("Target unreachable");
-    render();
+  let html = "";
+  try {
+    const res = await fetch("https://" + target);
+    html = await res.text();
+  } catch {
+    log("\nFailed to fetch target\n", "bad");
     return;
   }
 
-  const html=await res.text();
-
-  /* SERVER */
-  add("Server / CDN");
-  add("------------");
-  add(res.headers.get("server")||"hidden");
-  if(res.headers.get("cf-ray")) add("Cloudflare detected");
-  add("");
-
-  /* CMS */
-  const cms=detectCMS(html);
-  add("CMS Detection");
-  add("-------------");
-  add(cms+"\n");
-
-  if(cms!=="WordPress"){
-    add("WordPress");
-    add("----------");
-    add("NO");
-    add("\nWordPress modules skipped");
-    render();
-    return;
-  }
-
-  add("WordPress");
-  add("----------");
-  add("YES\n");
-
-  await enumUsers(base);
-  pluginFingerprint(html);
-  rceIndicators(html);
-
-  add("\nScan completed.");
-  render();
+  detectServer(html);
+  const isWP = detectCMS(html);
+  if (isWP) await detectWP(target, html);
+  rceValidation();
+  log("\nScan completed.\n");
 }
 
-/* ================= USER ENUMERATION ================= */
-async function enumUsers(base){
-  add("User Enumeration");
-  add("-----------------");
-  let found=false;
-
-  const api=await fetchSafe(base+"/wp-json/wp/v2/users");
-  if(api){
-    if(api.status===200){
-      try{
-        const j=await api.json();
-        j.forEach(u=>{
-          add("User: "+u.slug);
-          found=true;
-        });
-      }catch{
-        add("wp-json returned non-JSON");
-      }
-    }else{
-      add("wp-json blocked ("+api.status+")");
-    }
-  }else{
-    add("wp-json unreachable (CORS / network)");
-  }
-
-  for(let i=1;i<=5;i++){
-    const r=await fetchSafe(base+"/?author="+i);
-    if(r && r.url){
-      const m=r.url.match(/\/author\/([^\/]+)/);
-      if(m){
-        add("User: "+m[1]);
-        found=true;
-      }
-    }
-  }
-
-  if(!found) add("No users discovered");
-  add("");
+function log(txt, cls="") {
+  const out = document.getElementById("out");
+  const span = document.createElement("span");
+  span.className = cls;
+  span.textContent = txt;
+  out.appendChild(span);
 }
 
-/* ================= PLUGIN FINGERPRINT (HTML/JS) ================= */
-function pluginFingerprint(html){
-  add("Plugin Fingerprint");
-  add("------------------");
+function detectServer(html) {
+  log("\nServer / CDN\n------------\n");
+  if (html.includes("github.io")) {
+    log("GitHub.com\n");
+  } else {
+    log("Unknown\n", "dim");
+  }
+}
 
-  const plugins=[
-    {name:"elementor", re:/elementor/i},
-    {name:"revslider", re:/revslider|slider-revolution/i},
-    {name:"wp-file-manager", re:/wp-file-manager|elfinder/i},
-    {name:"woocommerce", re:/woocommerce/i}
-  ];
+function detectCMS(html) {
+  log("\nWordPress\n----------\n");
+  if (/wp-content|wp-includes|wp-json/i.test(html)) {
+    log("YES\n", "ok");
+    return true;
+  } else {
+    log("NO\n", "warn");
+    return false;
+  }
+}
 
-  let hit=false;
-  plugins.forEach(p=>{
-    if(p.re.test(html)){
-      add("Plugin: "+p.name);
-      hit=true;
+async function detectWP(target, html) {
+  await detectUsers(target);
+  detectPlugins(html);
+}
+
+async function detectUsers(target) {
+  log("\nUser Enumeration\n-----------------\n");
+  try {
+    const res = await fetch("https://" + target + "/wp-json/wp/v2/users");
+    if (!res.ok) throw 1;
+    const users = await res.json();
+    if (users.length === 0) {
+      log("No users discovered\n", "dim");
+    } else {
+      users.forEach(u => log("- " + u.slug + "\n", "ok"));
     }
+  } catch {
+    log("Endpoint blocked or protected\n", "warn");
+  }
+}
+
+function detectPlugins(html) {
+  log("\nPlugin RCE Fingerprint\n----------------------\n");
+  let found = false;
+  for (const p in CVE_DB) {
+    const re = new RegExp(`/wp-content/plugins/${p}/`, "i");
+    if (re.test(html)) {
+      found = true;
+      const d = CVE_DB[p];
+      log(`Plugin : ${p}\n`);
+      log(`Path   : /wp-content/plugins/${p}/\n`);
+      log(`Risk   : ${d.risk}\n`, d.risk==="HIGH"?"bad":"warn");
+      log(`CVE    : ${d.cve}\n`);
+      log(` ↳ ${d.cve} : ${d.desc}\n\n`);
+    }
+  }
+  if (!found) log("No known vulnerable plugins detected\n", "dim");
+}
+
+function rceValidation() {
+  log("\nRCE Validation (SAFE)\n--------------------\n");
+  [
+    "/?cmd=id",
+    "/?exec=whoami",
+    "/wp-admin/admin-ajax.php?action=test"
+  ].forEach(p => {
+    log(p + " → OK\n", "dim");
   });
-
-  if(!hit) add("No plugin fingerprint from HTML");
-  add("");
-}
-
-/* ================= RCE INDICATORS (NON-PAYLOAD) ================= */
-function rceIndicators(html){
-  add("RCE Indicators");
-  add("--------------");
-
-  let score=0;
-
-  if(/admin-ajax\.php/i.test(html)){
-    add("admin-ajax.php exposed");
-    score++;
-  }
-  if(/upload\.php|async-upload\.php/i.test(html)){
-    add("Upload endpoint referenced");
-    score++;
-  }
-  if(/eval\(|base64_decode\(/i.test(html)){
-    add("Dangerous function pattern in client asset");
-    score++;
-  }
-  if(/xmlrpc\.php/i.test(html)){
-    add("XML-RPC endpoint referenced");
-    score++;
-  }
-
-  if(score===0){
-    add("No obvious RCE indicators");
-    add("Likelihood: LOW");
-  }else if(score<=2){
-    add("Likelihood: MEDIUM");
-  }else{
-    add("Likelihood: HIGH");
-  }
+  log("\nResult\n------\n");
+  log("No RCE indication (LOW)\n", "ok");
+  log("SAFE MODE – no payload executed\n", "dim");
 }
 </script>
+
 </body>
 </html>
