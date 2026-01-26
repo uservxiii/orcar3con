@@ -3,29 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan (Stable + Admin Detect)</title>
+<title>ORCA WebScan (Stable + WP Admin Detect)</title>
 <style>
   :root{
     --navy:#0b1d3a;
-    --white:#fff;
-    --gray:#f4f6fb;
-    --border:#e0e6f2;
+    --white:#ffffff;
+    --gray:#f0f2f6;
+    --gray2:#d9dde6;
+    --text:#1f2a3a;
+    --shadow: 0 10px 30px rgba(0,0,0,0.08);
     --ok:#0a6;
     --warn:#a80;
     --err:#a00;
-    --shadow: 0 8px 24px rgba(0,0,0,0.08);
   }
   [data-theme="dark"]{
-    --navy:#e9efff;
+    --navy:#1b2a4a;
     --white:#0b1220;
     --gray:#0a1020;
-    --border:#1b2436;
-    --shadow: 0 10px 26px rgba(0,0,0,0.4);
+    --gray2:#1b2436;
+    --text:#e9efff;
+    --shadow: 0 10px 30px rgba(0,0,0,0.4);
   }
   body{
     margin:0;
     font-family:system-ui;
-    background: linear-gradient(180deg, #f7f9ff 0%, #f4f6fb 100%);
+    background: linear-gradient(180deg, var(--gray) 0%, #e9edf5 100%);
+    color:var(--text);
   }
   [data-theme="dark"] body{
     background: linear-gradient(180deg, #0a0f1f 0%, #0a1020 100%);
@@ -36,19 +39,19 @@
     overflow:hidden;
   }
   .sidebar{
-    width:280px;
-    background:var(--white);
-    border-right:1px solid var(--border);
+    width:300px;
+    background:var(--gray);
+    border-right:1px solid var(--gray2);
     box-shadow: var(--shadow);
-    padding:20px;
+    padding:22px;
     box-sizing:border-box;
   }
   [data-theme="dark"] .sidebar{
-    background:#0f172a;
-    border-color:#1b2436;
+    background: #0f172a;
+    border-color: var(--gray2);
   }
   .sidebar h1{
-    font-size:20px;
+    font-size:22px;
     margin:0 0 10px 0;
     color:var(--navy);
   }
@@ -61,11 +64,12 @@
     width:100%;
     padding:12px;
     border-radius:12px;
-    border:1px solid var(--border);
+    border:1px solid var(--gray2);
     background:var(--navy);
     color:#fff;
     cursor:pointer;
     margin-bottom:10px;
+    font-weight:600;
   }
   .sidebar button:hover{ transform:translateY(-1px); }
   .sidebar button:active{ transform:translateY(0); }
@@ -90,38 +94,36 @@
   .tab{
     padding:10px 14px;
     border-radius:12px;
-    border:1px solid var(--border);
-    background:var(--white);
+    border:1px solid var(--gray2);
+    background:var(--gray);
     cursor:pointer;
+    font-weight:600;
   }
   .tab.active{
     background:var(--navy);
     color:#fff;
     border-color:var(--navy);
   }
-  [data-theme="dark"] .tab{
-    background:#0f172a;
-  }
   .card{
     background:var(--white);
     border-radius:18px;
     padding:20px;
-    border:1px solid var(--border);
+    border:1px solid var(--gray2);
     box-shadow: var(--shadow);
   }
   [data-theme="dark"] .card{
     background:#0f172a;
-    border-color:#1b2436;
+    border-color:var(--gray2);
   }
   input,button,textarea,select{
     padding:12px;
     font-size:16px;
     border-radius:12px;
-    border:1px solid var(--border);
+    border:1px solid var(--gray2);
     width:100%;
     box-sizing:border-box;
     background:var(--white);
-    color:var(--navy);
+    color:var(--text);
   }
   [data-theme="dark"] input,[data-theme="dark"] textarea,[data-theme="dark"] select{
     background:#121a2c;
@@ -149,7 +151,7 @@
     border-radius:12px;
     overflow:auto;
     white-space:pre-wrap;
-    color:var(--navy);
+    color:var(--text);
   }
   [data-theme="dark"] pre{
     background:#0f172a;
@@ -228,7 +230,7 @@
     </div>
 
     <div id="tab-admin" class="card tab-content" style="display:none;">
-      <h2>Admin Login Detect</h2>
+      <h2>Admin Login Detect (WP + Generic)</h2>
       <div class="row">
         <input id="adminTarget" placeholder="domain.com" />
         <button id="adminBtn">Detect</button>
@@ -251,16 +253,24 @@
 const PROXY = "https://r.jina.ai/http://";
 
 let lastReport = null;
+
+// updated admin paths (WP + common)
 const adminPaths = [
+  "/wp-login.php",
+  "/wp-admin/",
+  "/wp-admin/admin-ajax.php",
+  "/wp-admin/setup-config.php",
+  "/wp-admin/install.php",
+  "/xmlrpc.php",
+  "/wp-json/",
+  "/wp-content/",
   "/admin",
   "/administrator",
   "/login",
-  "/wp-admin",
-  "/wp-login.php",
-  "/user/login",
-  "/cpanel",
   "/admin/login",
-  "/adminpanel"
+  "/adminpanel",
+  "/cpanel",
+  "/user/login"
 ];
 
 // helpers
@@ -415,7 +425,7 @@ async function adminDetect(domain){
     const p = adminPaths[i];
     try{
       const res = await timeoutFetch(PROXY + "http://" + domain + p, 5000);
-      const ok = res.status===200 || (res.status>=300 && res.status<400);
+      const ok = res.status===200 || (res.status>=300 && res.status<400) || res.status===401 || res.status===403;
       results.push({path:p,status:res.status,ok});
     }catch{
       results.push({path:p,status:"fail",ok:false});
