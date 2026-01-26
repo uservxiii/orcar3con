@@ -1,230 +1,107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WebScan ORCA</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORCA WebScan</title>
+
 <style>
-    :root{
-        --navy: #0b1d3a;
-        --navy2: #0f2a55;
-        --white: #ffffff;
-        --gray: #f4f6fb;
-        --text: #0b1d3a;
-        --muted: #6b7a8a;
-        --border: #e0e6f2;
-        --shadow: rgba(11, 29, 58, 0.12);
-    }
-    *{ box-sizing: border-box; }
-    body{
-        margin:0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: var(--gray);
-        color: var(--text);
-    }
-    .container{
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-    }
-    .header{
-        text-align: center;
-        padding: 20px 0;
-    }
-    h1{
-        margin: 0;
-        font-size: 26px;
-        color: var(--navy);
-    }
-    p{
-        margin: 5px 0 0 0;
-        color: var(--muted);
-    }
-    .card{
-        background: var(--white);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 10px 30px var(--shadow);
-        border: 1px solid var(--border);
-    }
-    .form-group{
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    input{
-        flex: 1;
-        padding: 12px 14px;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        font-size: 16px;
-        outline: none;
-    }
-    button{
-        padding: 12px 16px;
-        border-radius: 12px;
-        border: none;
-        background: var(--navy);
-        color: var(--white);
-        font-size: 16px;
-        cursor: pointer;
-        min-width: 140px;
-    }
-    button:hover{
-        background: var(--navy2);
-    }
-    .result{
-        margin-top: 20px;
-        background: #f7f9ff;
-        padding: 15px;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        white-space: pre-wrap;
-        font-family: monospace;
-        font-size: 13px;
-        color: #0b1d3a;
-    }
-    .loading{
-        display:none;
-        margin-top: 12px;
-        text-align:center;
-    }
-    .spinner{
-        border: 4px solid #d7e2f5;
-        border-top: 4px solid var(--navy);
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-        animation: spin 1s linear infinite;
-        margin: auto;
-    }
-    @keyframes spin{
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    @media (max-width: 600px){
-        h1{ font-size: 22px; }
-        .form-group{ flex-direction: column; }
-        button{ width: 100%; }
-    }
+:root{
+  --navy:#0b1d3a;--white:#fff;--gray:#f4f6fb;--border:#e0e6f2;
+}
+body{margin:0;font-family:system-ui;background:var(--gray)}
+.container{max-width:900px;margin:auto;padding:20px}
+.card{background:#fff;border-radius:14px;padding:20px;border:1px solid var(--border)}
+h1{text-align:center;color:var(--navy)}
+input,button{padding:12px;font-size:16px;border-radius:10px;border:1px solid var(--border)}
+button{background:var(--navy);color:#fff;cursor:pointer}
+pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
+.badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px}
+.ok{background:#d4f8e8;color:#0a6}
+.warn{background:#fff4cc;color:#a80}
+.err{background:#ffd6d6;color:#a00}
 </style>
 </head>
+
 <body>
 <div class="container">
-    <div class="header">
-        <h1>WebScan ORCA</h1>
-        <p>Masukkan domain saja. Contoh: <b>domain.com</b></p>
-    </div>
+<h1>ORCA WebScan</h1>
 
-    <div class="card">
-        <form id="scanForm">
-            <div class="form-group">
-                <input id="target" type="text" placeholder="domain.com" />
-                <button type="submit">Scan</button>
-            </div>
-        </form>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p style="margin-top: 8px; color: var(--muted);">Scanning...</p>
-        </div>
-
-        <div class="result" id="result"></div>
-    </div>
+<div class="card">
+<input id="target" placeholder="domain.com">
+<button onclick="run()">Scan</button>
+<pre id="out"></pre>
+</div>
 </div>
 
 <script>
-const PROXY = "https://r.jina.ai/http://";
+const PROXY="https://r.jina.ai/http://";
 
-function normalizeUrl(url){
-    url = url.trim();
-    // remove https:// or http:// if user input includes it
-    url = url.replace(/^https?:\/\//, "");
-    return url.replace(/\/+$/, "");
+function clean(d){
+  return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');
 }
 
-async function fetchProxy(url){
-    try{
-        const res = await fetch(PROXY + url);
-        const text = await res.text();
-        return {status: res.status, url: res.url, text};
-    } catch(e){
-        return {status: null, url: null, text: e.message};
-    }
+async function timeoutFetch(url,ms=8000){
+  const ctrl=new AbortController();
+  setTimeout(()=>ctrl.abort(),ms);
+  const r=await fetch(url,{signal:ctrl.signal});
+  return r;
 }
 
-async function nslookup(domain){
-    const url = `https://dns.google/resolve?name=${domain}&type=A`;
-    try{
-        const res = await fetch(PROXY + url);
-        const data = await res.json();
-        return data;
-    }catch(e){
-        return {error: "DNS lookup failed"};
-    }
+async function dns(domain){
+  const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
+  return r.json();
 }
 
-function fingerprintFromBody(body){
-    const patterns = [
-        {name: "WordPress", check: /wp-content|wp-includes/i},
-        {name: "Joomla", check: /Joomla!/i},
-        {name: "Drupal", check: /drupal/i},
-        {name: "Laravel", check: /laravel/i},
-        {name: "React", check: /<div id="root">/i},
-        {name: "Angular", check: /ng-app/i},
-        {name: "Vue.js", check: /<div id="app">/i}
-    ];
-
-    let detected = [];
-    for(const p of patterns){
-        if(p.check.test(body)) detected.push(p.name);
-    }
-
-    return detected.length ? detected : ["Unknown"];
+function fingerprint(body){
+  const map=[
+    ["WordPress",/wp-content|wp-includes/i],
+    ["Joomla",/Joomla!/i],
+    ["Drupal",/drupal/i],
+    ["Laravel",/laravel/i],
+    ["Cloudflare",/cloudflare/i]
+  ];
+  return map.filter(x=>x[1].test(body)).map(x=>x[0]);
 }
 
-async function scan(target){
-    target = normalizeUrl(target);
+async function run(){
+  const o=document.getElementById("out");
+  o.textContent="Scanning...\n";
+  const domain=clean(document.getElementById("target").value);
+  if(!domain)return;
 
-    const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
-    let template = {};
+  let result={target:domain};
 
-    const base = await fetchProxy("http://" + target);
+  try{
+    const r=await timeoutFetch(PROXY+"http://"+domain);
+    const text=await r.text();
 
-    for(const p of probes){
-        const res = await fetchProxy("http://" + target + "?test=" + encodeURIComponent(p));
-        template[p] = res.text.includes("49");
-    }
-
-    const dns = await nslookup(target);
-
-    return {
-        target,
-        status: base.status,
-        final_url: base.url,
-        template_probe: template,
-        detected: fingerprintFromBody(base.text),
-        dns
+    result.http={
+      status:r.status,
+      redirect:r.url,
+      reachable:r.status<500
     };
+
+    result.fingerprint=fingerprint(text);
+  }catch(e){
+    result.http={error:"Request blocked or timeout"};
+  }
+
+  try{
+    const d=await dns(domain);
+    result.dns=d.Answer?.map(x=>x.data)||[];
+  }catch{
+    result.dns="DNS lookup failed";
+  }
+
+  result.note=[
+    "HTML-only scanner",
+    "No exploitation",
+    "Indicators only"
+  ];
+
+  o.textContent=JSON.stringify(result,null,2);
 }
-
-const form = document.getElementById("scanForm");
-const result = document.getElementById("result");
-const loading = document.getElementById("loading");
-
-form.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    const target = document.getElementById("target").value;
-    if(!target) return;
-
-    loading.style.display = "block";
-    result.innerText = "";
-
-    const data = await scan(target);
-
-    loading.style.display = "none";
-    result.innerText = JSON.stringify(data, null, 2);
-});
 </script>
 </body>
 </html>
