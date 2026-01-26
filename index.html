@@ -3,153 +3,132 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WebScan ORCA (Valid Template Injection)</title>
+<title>WebScan ORCA</title>
 <style>
-    :root{
-        --navy: #0b1d3a;
-        --navy2: #0f2a55;
-        --white: #ffffff;
-        --gray: #f4f6fb;
-        --text: #0b1d3a;
-        --muted: #6b7a8a;
-        --border: #e0e6f2;
-        --shadow: rgba(11, 29, 58, 0.12);
-        --green: #1a8a6a;
-        --red: #d32f2f;
-    }
+:root{
+    --navy: #0b1d3a;
+    --navy2: #0f2a55;
+    --white: #ffffff;
+    --gray: #f4f6fb;
+    --text: #0b1d3a;
+    --muted: #6b7a8a;
+    --border: #e0e6f2;
+    --shadow: rgba(11, 29, 58, 0.12);
+}
 
-    *{ box-sizing: border-box; }
-    body{
-        margin:0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background: var(--gray);
-        color: var(--text);
-    }
+*{ box-sizing: border-box; }
+body{
+    margin:0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--gray);
+    color: var(--text);
+}
 
-    .container{
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-    }
+.container{
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
 
-    .header{
-        text-align: center;
-        padding: 20px 0;
-    }
+.header{
+    text-align: center;
+    padding: 20px 0;
+}
 
-    h1{
-        margin: 0;
-        font-size: 26px;
-        color: var(--navy);
-    }
+h1{
+    margin: 0;
+    font-size: 26px;
+    color: var(--navy);
+}
 
-    p{
-        margin: 5px 0 0 0;
-        color: var(--muted);
-    }
+p{
+    margin: 5px 0 0 0;
+    color: var(--muted);
+}
 
-    .card{
-        background: var(--white);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 10px 30px var(--shadow);
-        border: 1px solid var(--border);
-    }
+.card{
+    background: var(--white);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 10px 30px var(--shadow);
+    border: 1px solid var(--border);
+}
 
-    .form-group{
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
+.form-group{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
 
-    input{
-        flex: 1;
-        padding: 12px 14px;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        font-size: 16px;
-        outline: none;
-    }
+input{
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    font-size: 16px;
+    outline: none;
+}
 
-    button{
-        padding: 12px 16px;
-        border-radius: 12px;
-        border: none;
-        background: var(--navy);
-        color: var(--white);
-        font-size: 16px;
-        cursor: pointer;
-        min-width: 140px;
-    }
+button{
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: none;
+    background: var(--navy);
+    color: var(--white);
+    font-size: 16px;
+    cursor: pointer;
+    min-width: 140px;
+}
 
-    button:hover{
-        background: var(--navy2);
-    }
+button:hover{
+    background: var(--navy2);
+}
 
-    .result{
-        margin-top: 20px;
-        background: #f7f9ff;
-        padding: 15px;
-        border-radius: 12px;
-        border: 1px solid var(--border);
-        font-size: 14px;
-        color: #0b1d3a;
-    }
+.result{
+    margin-top: 20px;
+    background: #f7f9ff;
+    padding: 15px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 13px;
+    color: #0b1d3a;
+}
 
-    .code{
-        margin-top: 10px;
-        background: #0b1d3a;
-        color: #fff;
-        padding: 12px;
-        border-radius: 12px;
-        font-family: monospace;
-        font-size: 13px;
-        white-space: pre-wrap;
-    }
+.loading{
+    display:none;
+    margin-top: 12px;
+    text-align:center;
+}
 
-    .status {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-weight: 600;
-        font-size: 12px;
-    }
-    .ok { background: var(--green); color: #fff; }
-    .bad { background: var(--red); color: #fff; }
+.spinner{
+    border: 4px solid #d7e2f5;
+    border-top: 4px solid var(--navy);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    animation: spin 1s linear infinite;
+    margin: auto;
+}
 
-    .loading{
-        display:none;
-        margin-top: 12px;
-        text-align:center;
-    }
+@keyframes spin{
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
-    .spinner{
-        border: 4px solid #d7e2f5;
-        border-top: 4px solid var(--navy);
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-        animation: spin 1s linear infinite;
-        margin: auto;
-    }
-
-    @keyframes spin{
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    @media (max-width: 600px){
-        h1{ font-size: 22px; }
-        .form-group{ flex-direction: column; }
-        button{ width: 100%; }
-    }
+@media (max-width: 600px){
+    h1{ font-size: 22px; }
+    .form-group{ flex-direction: column; }
+    button{ width: 100%; }
+}
 </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
         <h1>WebScan ORCA</h1>
-        <p>Validasi Template Injection (safe, non-exploit)</p>
+        <p>Masukkan domain saja. Contoh: <b>domain.com</b></p>
     </div>
 
     <div class="card">
@@ -170,6 +149,8 @@
 </div>
 
 <script>
+const PROXY = "https://r.jina.ai/http://";
+
 function normalizeUrl(url){
     url = url.trim();
     if(!url.startsWith("http")){
@@ -178,63 +159,56 @@ function normalizeUrl(url){
     return url.replace(/\/+$/, "");
 }
 
-function randId(){
-    return Math.floor(Math.random() * 1000000);
-}
-
-async function fetchText(url){
+async function fetchProxy(url){
     try{
-        const res = await fetch(url);
+        const res = await fetch(PROXY + url);
         const text = await res.text();
         return {status: res.status, url: res.url, text};
-    }catch(e){
+    } catch(e){
         return {status: null, url: null, text: e.message};
     }
 }
 
-function buildPayloads(id){
-    return [
-        {name: "Handlebars/Jinja", payload: `{{"ORCA-${id}"}}`},
-        {name: "JS Template", payload: `${"ORCA-" + id}`},  // this is just plain text for safety
-        {name: "ERB/Ruby", payload: `<%= "ORCA-${id}" %>`}
-    ];
+async function dnsLookup(domain){
+    const url = `https://dns.google/resolve?name=${domain}&type=A`;
+    try{
+        const res = await fetch(url);
+        return await res.json();
+    } catch(e){
+        return {error: "DNS failed"};
+    }
+}
+
+function parseHeaders(text){
+    // Jina proxy response has headers inside body? we cannot access real headers
+    return {
+        server: "",
+        powered: ""
+    };
 }
 
 async function scan(target){
     target = normalizeUrl(target);
+    const domain = target.replace(/^https?:\/\//, "");
 
-    const id = randId();
-    const payloads = buildPayloads(id);
+    const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
+    let template = {};
 
-    let results = [];
-    let successCount = 0;
+    const base = await fetchProxy(target);
 
-    // base check
-    const base = await fetchText(target);
-
-    // probe each payload
-    for(const p of payloads){
-        const res = await fetchText(target + "?test=" + encodeURIComponent(p.payload));
-        const ok = res.text.includes(`ORCA-${id}`);
-        if(ok) successCount++;
-
-        results.push({
-            engine: p.name,
-            payload: p.payload,
-            found: ok,
-            status: res.status
-        });
+    for(const p of probes){
+        const res = await fetchProxy(target + "?test=" + encodeURIComponent(p));
+        template[p] = res.text.includes("49");
     }
 
-    const confirmed = successCount >= 2;
+    const dns = await dnsLookup(domain);
 
     return {
         target,
         status: base.status,
-        confirmed,
-        successCount,
-        id,
-        results
+        final_url: base.url,
+        template_probe: template,
+        dns
     };
 }
 
@@ -248,22 +222,12 @@ form.addEventListener("submit", async (e)=>{
     if(!target) return;
 
     loading.style.display = "block";
-    result.innerHTML = "";
+    result.innerText = "";
 
     const data = await scan(target);
 
     loading.style.display = "none";
-
-    let html = "";
-    html += `<div>Status: <span class="status ${data.confirmed ? 'ok' : 'bad'}">${data.confirmed ? 'CONFIRMED' : 'NOT CONFIRMED'}</span></div>`;
-    html += `<div style="margin-top:8px;">Target: <b>${data.target}</b></div>`;
-    html += `<div style="margin-top:8px;">Success: <b>${data.successCount}</b> / 3</div>`;
-
-    html += `<div class="code">`;
-    html += JSON.stringify(data, null, 2);
-    html += `</div>`;
-
-    result.innerHTML = html;
+    result.innerText = JSON.stringify(data, null, 2);
 });
 </script>
 </body>
