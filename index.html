@@ -1,192 +1,165 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan – Passive Recon</title>
-
+<title>ORCA WebScan – WordPress LAB (Next Level)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-:root{
-  --bg:#070a14;
-  --panel:#0b1220;
-  --text:#e9efff;
-  --muted:#9aa3b7;
-  --border:#1b2436;
-  --accent:#5b8cff;
-  --high:#ef4444;
-  --med:#f59e0b;
-  --low:#22c55e;
-}
-body{
-  margin:0;
-  font-family:system-ui,Segoe UI,sans-serif;
-  background:linear-gradient(180deg,#070a14,#0a1020);
-  color:var(--text);
-}
-.container{max-width:1200px;margin:auto;padding:24px}
-.card{
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:18px;
-  padding:20px;
-}
-h1{margin:0;color:var(--accent)}
-.small{font-size:13px;color:var(--muted)}
-.row{display:flex;gap:10px;margin-top:12px}
-input,button{
-  padding:12px;
-  font-size:15px;
-  border-radius:12px;
-  border:1px solid var(--border);
-  background:#0f172a;
-  color:var(--text);
-}
-input{flex:1}
-button{background:var(--accent);cursor:pointer}
-button:hover{opacity:.95}
-.pre{
-  margin-top:16px;
-  background:#020617;
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:16px;
-  white-space:pre-wrap;
-  font-family:ui-monospace,Consolas,monospace;
-  font-size:14px;
-}
-.footer{
-  margin-top:14px;
-  text-align:center;
-  font-size:12px;
-  color:var(--muted);
-}
-.badge{padding:2px 8px;border-radius:8px;font-size:12px}
-.high{background:#3f0d0d;color:var(--high)}
-.med{background:#3a2a05;color:var(--med)}
-.low{background:#052e1a;color:var(--low)}
+body{margin:0;font-family:system-ui;background:#0b1220;color:#e9efff}
+.container{max-width:1200px;margin:auto;padding:20px}
+.card{background:#121a2c;border-radius:16px;padding:18px;margin-bottom:16px}
+input,button{padding:12px;border-radius:10px;border:none;font-size:16px}
+input{width:70%}
+button{background:#4f7cff;color:#fff;cursor:pointer}
+pre{background:#0a1020;padding:14px;border-radius:10px;overflow:auto;white-space:pre-wrap}
+h1{margin-top:0}
+.badge{padding:4px 8px;border-radius:6px;font-size:12px}
+.ok{background:#0a6}
+.warn{background:#a80}
+.err{background:#a00}
 </style>
 </head>
-
 <body>
+
 <div class="container">
-  <div class="card">
-    <h1>🐋 ORCA WebScan</h1>
-    <div class="small">
-      Passive Recon Engine · WordPress CVE Matcher · GitHub Pages Safe
-    </div>
+<h1>🛡️ ORCA WebScan – WordPress LAB (Next Level)</h1>
 
-    <div class="row">
-      <input id="target" placeholder="example.com">
-      <input id="wpver" placeholder="WP version (e.g. 6.2.1)">
-      <button onclick="runScan()">Scan</button>
-    </div>
+<div class="card">
+<input id="target" placeholder="example.com">
+<button onclick="scan()">Scan</button>
+</div>
 
-    <div class="row">
-      <input id="plugins" placeholder="Plugins (comma separated, e.g. elementor,contact-form-7)">
-      <input id="themes" placeholder="Themes (comma separated, e.g. astra,twentytwentythree)">
-    </div>
-
-    <div id="output" class="pre">Results will appear here…</div>
-
-    <div class="footer">
-      ⚠️ Passive only · No HTTP requests · CVE matched by version/name heuristic
-    </div>
-  </div>
+<div class="card">
+<pre id="out">Idle.</pre>
+</div>
 </div>
 
 <script>
-/* =========================
-   STATIC CVE DATABASE
-========================= */
-const WP_CORE_CVE = [
- {cve:"CVE-2022-21661",affected:"<5.8.3",sev:"High",desc:"SQL Injection via WP_Query"},
- {cve:"CVE-2023-2745",affected:"<6.2.1",sev:"High",desc:"Auth bypass REST API"},
- {cve:"CVE-2023-4515",affected:"<6.3.1",sev:"Medium",desc:"Stored XSS block editor"}
-];
+// ================== OFFLINE CVE DB ==================
+const CVE_DB = {
+  core:{
+    "6.2":["CVE-2023-2745"],
+    "5.9":["CVE-2022-21661"]
+  },
+  plugins:{
+    "contact-form-7":["CVE-2020-35489"],
+    "elementor":["CVE-2023-48777"],
+    "woocommerce":["CVE-2021-32790"]
+  },
+  themes:{
+    "twentytwentyone":["CVE-2021-39200"]
+  }
+};
 
-const WP_PLUGIN_CVE = [
- {name:"elementor",cve:"CVE-2023-4514",sev:"High",desc:"Unauth file upload"},
- {name:"contact-form-7",cve:"CVE-2020-35489",sev:"Medium",desc:"Stored XSS"},
- {name:"woocommerce",cve:"CVE-2021-32790",sev:"High",desc:"Privilege escalation"}
-];
+// ================== HELPERS ==================
+const clean = d=>d.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+const out = t=>document.getElementById("out").textContent=t;
 
-const WP_THEME_CVE = [
- {name:"astra",cve:"CVE-2022-2982",sev:"Medium",desc:"XSS via customizer"},
- {name:"twentytwenty",cve:"CVE-2021-29447",sev:"Low",desc:"SVG upload issue"}
-];
-
-/* =========================
-   UTIL
-========================= */
-function cleanDomain(d){
-  return d.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/^www\./,"").split("/")[0];
-}
-function verLess(v,max){
-  const a=v.split(".").map(Number), b=max.split(".").map(Number);
-  for(let i=0;i<3;i++){ if((a[i]||0)!==(b[i]||0)) return (a[i]||0)<(b[i]||0); }
-  return false;
+async function safeFetch(url){
+  try{ return await fetch(url); }catch{ return null; }
 }
 
-/* =========================
-   MATCHERS
-========================= */
-function matchCore(ver){
-  if(!ver) return [];
-  return WP_CORE_CVE.filter(c=>verLess(ver,c.affected.replace("<","")));
+// ================== MAIN SCAN ==================
+async function scan(){
+  const domain = clean(target.value.trim());
+  if(!domain) return;
+  out("Scanning...");
+
+  let log=`Target\n------\n${domain}\n\n`;
+
+  const base = "https://" + domain;
+  const res = await safeFetch(base);
+  if(!res){ out("Failed to connect."); return; }
+
+  const html = await res.text();
+  const headers = {};
+  res.headers.forEach((v,k)=>headers[k]=v);
+
+  // ===== WordPress detect =====
+  const isWP = /wp-content|wp-includes/i.test(html);
+  log+=`WordPress Detected\n------------------\n${isWP?"YES":"NO"}\n\n`;
+
+  // ===== Version detect =====
+  let version="Not provided";
+  const v = html.match(/generator.+wordpress\s([0-9.]+)/i);
+  if(v) version=v[1];
+  log+=`WordPress Version\n----------------\n${version}\n\n`;
+
+  // ===== Admin login =====
+  log+="Admin Login Paths\n-----------------\n";
+  for(const p of ["/wp-login.php","/wp-admin/"]){
+    const r = await safeFetch(base+p);
+    log+=`${p} => ${r?r.status:"blocked"}\n`;
+  }
+
+  // ===== xmlrpc =====
+  log+="\nXML-RPC Check\n-------------\n";
+  const xr = await safeFetch(base+"/xmlrpc.php");
+  log+=xr?`xmlrpc.php => ${xr.status}\n`:"xmlrpc blocked\n";
+
+  // ===== wp-json mapper =====
+  log+="\nwp-json Endpoint Mapper\n----------------------\n";
+  const endpoints=[
+    "/wp-json/","/wp-json/wp/v2/users",
+    "/wp-json/wp/v2/posts",
+    "/wp-json/wp/v2/pages"
+  ];
+  for(const e of endpoints){
+    const r = await safeFetch(base+e);
+    log+=`${e} => ${r?r.status:"blocked"}\n`;
+  }
+
+  // ===== Passive user enum =====
+  log+="\nPassive User Enumeration\n------------------------\n";
+  const u = await safeFetch(base+"/?author=1");
+  log+=u && u.url.includes("/author/") ? "Author archive exposed\n" : "Author enum protected\n";
+
+  // ===== Plugin detect =====
+  const plugins=[...new Set(
+    [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)]
+    .map(m=>m[1])
+  )];
+  log+="\nPlugins Detected\n----------------\n";
+  log+=plugins.length?plugins.join(", ")+"\n":"None\n";
+
+  // ===== Theme detect =====
+  let theme="Unknown";
+  const t = html.match(/wp-content\/themes\/([a-z0-9-_]+)/i);
+  if(t) theme=t[1];
+  log+=`\nTheme Detected\n--------------\n${theme}\n`;
+
+  // ===== Security headers =====
+  const secHeaders=[
+    "content-security-policy",
+    "strict-transport-security",
+    "x-frame-options",
+    "x-content-type-options",
+    "referrer-policy"
+  ];
+  let score=0;
+  log+="\nSecurity Headers\n----------------\n";
+  secHeaders.forEach(h=>{
+    if(headers[h]){ log+=`${h}: present\n`; score+=10; }
+    else log+=`${h}: missing\n`;
+  });
+  log+=`\nHeader Score: ${score}/50\n`;
+
+  // ===== CVE match =====
+  log+="\n[ Core CVE Match ]\n-----------------\n";
+  log+=CVE_DB.core[version]?.join(", ")||"None";
+  log+="\n\n[ Plugin CVE Match ]\n-------------------\n";
+  let pc=[];
+  plugins.forEach(p=>{
+    if(CVE_DB.plugins[p]) pc.push(`${p}: ${CVE_DB.plugins[p].join(", ")}`);
+  });
+  log+=pc.length?pc.join("\n"):"None";
+  log+="\n\n[ Theme CVE Match ]\n------------------\n";
+  log+=CVE_DB.themes[theme]?.join(", ")||"None";
+
+  log+="\n\nScan Mode\n---------\nPassive LAB Scan (No Exploit)\n";
+
+  out(log);
 }
-function matchPlugins(list){
-  if(!list.length) return [];
-  return WP_PLUGIN_CVE.filter(c=>list.includes(c.name));
-}
-function matchThemes(list){
-  if(!list.length) return [];
-  return WP_THEME_CVE.filter(c=>list.includes(c.name));
-}
-
-/* =========================
-   MAIN
-========================= */
-function runScan(){
-  const domain=cleanDomain(target.value);
-  const wpver=wpverInput();
-  const plugins=parseList(pluginsInput());
-  const themes=parseList(themesInput());
-
-  const core=matchCore(wpver);
-  const pcve=matchPlugins(plugins);
-  const tcve=matchThemes(themes);
-
-  output.textContent=
-`Target
-------
-${domain}
-
-WordPress Version
-----------------
-${wpver || "Not provided"}
-
-[ Core CVE Match ]
------------------
-${core.length?core.map(c=>`• ${c.cve} [${c.sev}] ${c.desc} (Affected ${c.affected})`).join("\n"):"None"}
-
-[ Plugin CVE Match ]
--------------------
-${pcve.length?pcve.map(c=>`• ${c.name} → ${c.cve} [${c.sev}] ${c.desc}`).join("\n"):"None"}
-
-[ Theme CVE Match ]
-------------------
-${tcve.length?tcve.map(c=>`• ${c.name} → ${c.cve} [${c.sev}] ${c.desc}`).join("\n"):"None"}
-
-Scan Mode
----------
-Passive CVE Matching (Offline DB)
-`;
-}
-
-function wpverInput(){return document.getElementById("wpver").value.trim();}
-function pluginsInput(){return document.getElementById("plugins").value;}
-function themesInput(){return document.getElementById("themes").value;}
-function parseList(v){return v.toLowerCase().split(",").map(x=>x.trim()).filter(Boolean);}
 </script>
 </body>
 </html>
