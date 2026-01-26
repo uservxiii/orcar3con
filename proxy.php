@@ -1,21 +1,25 @@
 <?php
-if(!isset($_GET['url'])) die("no url");
-$url=$_GET['url'];
+if(!isset($_GET['u'])) exit;
 
-if(!preg_match('#^https?://#',$url)) die("invalid");
-
-$ch=curl_init($url);
-curl_setopt_array($ch,[
-  CURLOPT_RETURNTRANSFER=>true,
-  CURLOPT_FOLLOWLOCATION=>true,
-  CURLOPT_TIMEOUT=>12,
-  CURLOPT_USERAGENT=>"ORCA-WebScan"
+$url = $_GET['u'];
+$ch = curl_init($url);
+curl_setopt_array($ch, [
+  CURLOPT_RETURNTRANSFER => true,
+  CURLOPT_FOLLOWLOCATION => true,
+  CURLOPT_USERAGENT => "ORCA-WebScan",
+  CURLOPT_TIMEOUT => 15
 ]);
 
-$data=curl_exec($ch);
-$code=curl_getinfo($ch,CURLINFO_HTTP_CODE);
+$body = curl_exec($ch);
+$info = curl_getinfo($ch);
+$err  = curl_error($ch);
 curl_close($ch);
 
-http_response_code($code);
-header("Content-Type: application/json");
-echo $data;
+if($body===false){
+  http_response_code(502);
+  exit;
+}
+
+http_response_code($info['http_code']);
+header("Content-Type: text/plain");
+echo $body;
