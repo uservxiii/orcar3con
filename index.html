@@ -153,14 +153,18 @@ const PROXY = "https://r.jina.ai/http://";
 
 function normalizeDomain(domain){
     domain = domain.trim().toLowerCase();
-    domain = domain.replace(/^https?:\/\//, "");   // remove http:// or https://
-    domain = domain.replace(/^www\./, "");         // optional remove www
-    domain = domain.replace(/\/+$/, "");           // remove trailing slash
+    domain = domain.replace(/^https?:\/\//, "");
+    domain = domain.replace(/^www\./, "");
+    domain = domain.replace(/\/+$/, "");
     return domain;
 }
 
-function buildProxyUrl(domain){
-    return PROXY + domain;
+function buildProxyUrl(url){
+    // IMPORTANT: Do NOT add http:// twice
+    if(!url.startsWith("http://") && !url.startsWith("https://")){
+        url = "http://" + url;
+    }
+    return PROXY + url;
 }
 
 async function fetchProxy(url){
@@ -175,10 +179,10 @@ async function fetchProxy(url){
 
 async function dnsLookup(domain){
     const url = `https://dns.google/resolve?name=${domain}&type=A`;
+    const proxyUrl = buildProxyUrl(url); // CORRECT
     try{
-        const res = await fetch(PROXY + url);
-        const data = await res.json();
-        return data;
+        const res = await fetch(proxyUrl);
+        return await res.json();
     }catch(e){
         return {error: e.message};
     }
@@ -204,7 +208,7 @@ function detectCMS(body){
 async function scan(domain){
     const clean = normalizeDomain(domain);
 
-    const baseUrl = buildProxyUrl("http://" + clean);
+    const baseUrl = buildProxyUrl(clean);
 
     const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
     let template = {};
@@ -222,7 +226,7 @@ async function scan(domain){
     }
 
     for(const p of probes){
-        const url = buildProxyUrl("http://" + clean + "?test=" + encodeURIComponent(p));
+        const url = buildProxyUrl(clean + "?test=" + encodeURIComponent(p));
         const res = await fetchProxy(url);
         template[p] = res.ok ? res.text.includes("49") : false;
     }
