@@ -157,38 +157,45 @@ function normalizeUrl(url){
     return url.replace(/\/+$/, "");
 }
 
-async function fetchText(url){
+// -------------------------
+// Fetch with timeout
+// -------------------------
+async function fetchWithTimeout(url, timeoutMs=8000){
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
     try{
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: controller.signal });
         const text = await res.text();
+        clearTimeout(timer);
         return {status: res.status, url: res.url, headers: res.headers, text};
-    }catch(e){
+    } catch (e) {
+        clearTimeout(timer);
         return {status: null, url: null, headers: null, text: e.message};
     }
 }
 
-// ===========================
-// NSLOOKUP (CORS proxy)
-// ===========================
+// -------------------------
+// DNS Lookup (CORS proxy)
+// -------------------------
 async function nslookup(domain){
     const proxy = "https://api.allorigins.win/raw?url=";
     const url = proxy + encodeURIComponent(`https://dns.google/resolve?name=${domain}&type=A`);
 
     try{
-        const res = await fetch(url);
+        const res = await fetch(url, {timeout: 8000});
         const data = await res.json();
         return data;
     }catch(e){
-        return {error: e.message};
+        return {error: "DNS lookup failed (timeout or blocked)"};
     }
 }
 
 function fingerprintFromHeaders(headers, body){
-    const server = headers.get("server") || "";
-    const powered = headers.get("x-powered-by") || "";
+    const server = headers ? headers.get("server") || "" : "";
+    const powered = headers ? headers.get("x-powered-by") || "" : "";
     const generator = (body.match(/<meta name="generator" content="([^"]+)"/i) || [])[1] || "";
 
-    // basic CMS/framework checks
     const patterns = [
         {name: "WordPress", check: /wp-content|wp-includes/i},
         {name: "Joomla", check: /Joomla!/i},
@@ -203,7 +210,6 @@ function fingerprintFromHeaders(headers, body){
     for(const p of patterns){
         if(p.check.test(body)) detected.push(p.name);
     }
-
     if(generator) detected.push(generator);
 
     return {
@@ -221,19 +227,18 @@ async function scan(target){
     const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
     let template = {};
 
-    // Scan basic
-    const base = await fetchText(target);
+    // basic
+    const base = await fetchWithTimeout(target, 8000);
 
-    // Template probes
+    // template probes
     for(const p of probes){
-        const res = await fetchText(target + "?test=" + encodeURIComponent(p));
+        const res = await fetchWithTimeout(target + "?test=" + encodeURIComponent(p), 8000);
         template[p] = res.text.includes("49");
     }
 
-    // Fingerprint
     const fp = fingerprintFromHeaders(base.headers, base.text);
 
-    // DNS
+    // dns
     const dns = await nslookup(domain);
 
     return {
