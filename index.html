@@ -7,37 +7,14 @@
 <style>
 :root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
 *{box-sizing:border-box}
-body{
-  margin:0;font-family:monospace;
-  background:var(--bg);color:var(--text);
-  height:100vh;display:flex
-}
-.sidebar{
-  width:250px;background:var(--panel);
-  padding:18px;display:flex;flex-direction:column;gap:10px
-}
-button{
-  padding:10px;border-radius:10px;border:none;
-  background:var(--accent);color:#fff;cursor:pointer
-}
+body{margin:0;font-family:monospace;background:var(--bg);color:var(--text);height:100vh;display:flex}
+.sidebar{width:260px;background:var(--panel);padding:18px;display:flex;flex-direction:column;gap:10px}
+button{padding:10px;border-radius:10px;border:none;background:var(--accent);color:#fff;cursor:pointer}
 .main{flex:1;padding:18px;overflow:auto}
-.card{
-  background:var(--panel);
-  border-radius:14px;
-  padding:14px;margin-bottom:14px
-}
-input{
-  width:100%;padding:10px;border-radius:8px;
-  border:none;margin-bottom:6px
-}
-pre{
-  background:#060b18;
-  padding:14px;border-radius:12px;
-  white-space:pre-wrap
-}
-.ok{color:#7CFF7C}
-.warn{color:#FFD27C}
-.bad{color:#FF7C7C}
+.card{background:var(--panel);border-radius:14px;padding:14px;margin-bottom:14px}
+input{width:100%;padding:10px;border-radius:8px;border:none;margin-bottom:6px}
+pre{background:#060b18;padding:14px;border-radius:12px;white-space:pre-wrap}
+.ok{color:#7CFF7C}.warn{color:#FFD27C}.bad{color:#FF7C7C}
 </style>
 </head>
 
@@ -53,9 +30,8 @@ pre{
 <div class="main">
   <div class="card">
     <input id="target" placeholder="https://target.com">
-    <small>Passive reconnaissance · CLI style</small>
+    <small>aggressive web reconnaissance</small>
   </div>
-
   <div class="card">
     <pre id="out">$ orca ready</pre>
   </div>
@@ -68,12 +44,11 @@ const PROXY="proxy.php?url=";
 /* ================= CORE ================= */
 const out=document.getElementById("out");
 let log=["$ orca ready"];
-
 const add=t=>{log.push(t);out.textContent=log.join("\n");};
 const clearLog=()=>{log=["$ cleared"];out.textContent=log.join("\n");};
 
-async function fetchProxy(url){
-  try{return await fetch(PROXY+encodeURIComponent(url));}
+async function fetchP(u){
+  try{return await fetch(PROXY+encodeURIComponent(u));}
   catch{return null;}
 }
 
@@ -82,15 +57,17 @@ function help(){
 add(`
 Commands
 --------
-scan     run scan
-clear    clear output
+scan    full aggressive scan
+clear   clear output
 
-Capabilities
-------------
-- CMS detection
+Engine
+------
+- CMS multi-layer detection
 - WordPress user enumeration
-- Plugin fingerprint (HTML)
+- Plugin fingerprint (HTML + PATH)
+- Version detection
 - Online CVE mapping
+- CDN / origin hint
 `);
 }
 
@@ -103,52 +80,63 @@ async function scan(){
   add("$ scan "+base);
   add("");
 
-  const home=await fetchProxy(base);
+  const home=await fetchP(base);
   if(!home){add("[-] target unreachable");return;}
   const html=await home.text();
 
-  const cms=cmsDetect(html);
-  await wpUsers(base,cms);
-  const plugins=pluginFingerprint(html);
+  const cms=cmsDetect(html,base);
+  serverInfo(home);
+  if(cms==="wordpress") await wpUsers(base);
+  const plugins=await pluginDetect(html,base);
   await cveLookup(cms,plugins);
 
   add("");
   add("[+] scan completed");
 }
 
+/* ================= SERVER / CDN ================= */
+function serverInfo(r){
+  add("[*] Server / CDN");
+  const s=r.headers.get("server")||"hidden";
+  add("    server : "+s);
+  if(r.headers.get("cf-ray")) add("    cdn    : cloudflare");
+}
+
 /* ================= CMS DETECT ================= */
-function cmsDetect(html){
+function cmsDetect(html,base){
   add("[*] CMS detection");
-  if(/wp-content|wp-includes/i.test(html)){
-    add("    CMS : WordPress");
+  let score=0;
+
+  if(/wp-content|wp-includes/i.test(html)) score++;
+  if(/\/wp-login\.php/i.test(html)) score++;
+  if(/\/wp-json\//i.test(html)) score++;
+
+  if(score>=2){
+    add("    CMS : WordPress (high confidence)");
     return "wordpress";
   }
+
   if(/Joomla!|\/components\//i.test(html)){
     add("    CMS : Joomla");
     return "joomla";
   }
+
   if(/Drupal|\/sites\/default\//i.test(html)){
     add("    CMS : Drupal");
     return "drupal";
   }
-  if(/laravel|csrf-token/i.test(html)){
-    add("    CMS : Laravel");
-    return "laravel";
-  }
+
   add("    CMS : Unknown");
   return "unknown";
 }
 
 /* ================= WP USERS ================= */
-async function wpUsers(base,cms){
-  if(cms!=="wordpress") return;
-
+async function wpUsers(base){
   add("");
   add("[*] WordPress users");
-
-  const api=await fetchProxy(base+"/wp-json/wp/v2/users");
   let found=false;
 
+  const api=await fetchP(base+"/wp-json/wp/v2/users");
   if(api && api.status===200){
     try{
       const j=await api.json();
@@ -159,8 +147,8 @@ async function wpUsers(base,cms){
     }catch{}
   }
 
-  for(let i=1;i<=10;i++){
-    const r=await fetchProxy(base+"/?author="+i);
+  for(let i=1;i<=20;i++){
+    const r=await fetchP(base+"/?author="+i);
     if(r && r.url){
       const m=r.url.match(/\/author\/([^\/]+)/);
       if(m){
@@ -170,34 +158,46 @@ async function wpUsers(base,cms){
     }
   }
 
-  if(!found) add("    no users discovered");
+  if(!found) add("    no users discovered (blocked)");
 }
 
-/* ================= PLUGIN FINGERPRINT ================= */
-function pluginFingerprint(html){
+/* ================= PLUGIN DETECT ================= */
+async function pluginDetect(html,base){
   add("");
-  add("[*] Plugin fingerprint");
+  add("[*] Plugin detection");
 
-  const plugins=[
-    {name:"elementor",re:/elementor/i},
-    {name:"revslider",re:/revslider/i},
-    {name:"wp-file-manager",re:/wp-file-manager/i},
-    {name:"woocommerce",re:/woocommerce/i}
-  ];
-
+  const known=["elementor","revslider","wp-file-manager","woocommerce","contact-form-7"];
   const detected=[];
-  plugins.forEach(p=>{
-    if(p.re.test(html)){
-      detected.push(p.name);
-      add("    "+p.name+" detected");
+
+  for(const p of known){
+    let confidence=0;
+
+    if(new RegExp(p,"i").test(html)) confidence++;
+
+    const path=await fetchP(base+"/wp-content/plugins/"+p+"/");
+    if(path && path.status===200) confidence++;
+
+    if(confidence){
+      let version="unknown";
+      const readme=await fetchP(base+"/wp-content/plugins/"+p+"/readme.txt");
+      if(readme && readme.status===200){
+        const t=await readme.text();
+        const m=t.match(/Stable tag:\s*([0-9\.]+)/i);
+        if(m) version=m[1];
+      }
+
+      add(`    ${p} detected`);
+      add(`      confidence : ${confidence===2?"HIGH":"MEDIUM"}`);
+      add(`      version    : ${version}`);
+      detected.push({name:p,version});
     }
-  });
+  }
 
   if(!detected.length) add("    no known plugin detected");
   return detected;
 }
 
-/* ================= CVE ONLINE LOOKUP ================= */
+/* ================= CVE LOOKUP ================= */
 async function cveLookup(cms,plugins){
   add("");
   add("[*] CVE mapping");
@@ -208,13 +208,12 @@ async function cveLookup(cms,plugins){
   }
 
   for(const p of plugins){
-    add("    searching CVE for "+p+" ...");
-
-    const api=`https://cve.circl.lu/api/search/${cms}/${p}`;
-    const r=await fetchProxy(api);
+    add("    "+p.name);
+    const api=`https://cve.circl.lu/api/search/${cms}/${p.name}`;
+    const r=await fetchP(api);
 
     if(!r || r.status!==200){
-      add("      CVE lookup failed");
+      add("      lookup failed");
       continue;
     }
 
@@ -222,7 +221,7 @@ async function cveLookup(cms,plugins){
       const j=await r.json();
       if(j.data && j.data.length){
         j.data.slice(0,3).forEach(c=>{
-          add(`      ${c.id} | ${c.cvss || "N/A"} | ${c.summary}`);
+          add(`      ${c.id} | CVSS ${c.cvss || "N/A"} | ${c.summary}`);
         });
       }else{
         add("      no CVE found");
