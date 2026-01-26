@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan (Stable)</title>
+<title>ORCA WebScan (Stable + Admin Detect)</title>
 <style>
   :root{
     --navy:#0b1d3a;
@@ -191,6 +191,7 @@
     <div class="tabs">
       <div class="tab active" data-tab="scan">Scan</div>
       <div class="tab" data-tab="lab">Lab</div>
+      <div class="tab" data-tab="admin">Admin</div>
       <div class="tab" data-tab="history">History</div>
     </div>
 
@@ -226,6 +227,17 @@
       </div>
     </div>
 
+    <div id="tab-admin" class="card tab-content" style="display:none;">
+      <h2>Admin Login Detect</h2>
+      <div class="row">
+        <input id="adminTarget" placeholder="domain.com" />
+        <button id="adminBtn">Detect</button>
+      </div>
+      <div id="adminOut" style="margin-top:12px;">
+        <pre>No admin scan yet.</pre>
+      </div>
+    </div>
+
     <div id="tab-history" class="card tab-content" style="display:none;">
       <h2>History</h2>
       <div id="historyOut">
@@ -237,9 +249,19 @@
 
 <script>
 const PROXY = "https://r.jina.ai/http://";
-const ports = [80, 443, 8080, 8443];
 
 let lastReport = null;
+const adminPaths = [
+  "/admin",
+  "/administrator",
+  "/login",
+  "/wp-admin",
+  "/wp-login.php",
+  "/user/login",
+  "/cpanel",
+  "/admin/login",
+  "/adminpanel"
+];
 
 // helpers
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
@@ -310,6 +332,7 @@ async function scanDNS(domain){
   return out;
 }
 async function scanPorts(domain){
+  const ports = [80, 443, 8080, 8443];
   let res={};
   for(const p of ports){
     try{
@@ -342,7 +365,7 @@ function risk(r){
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
-// run
+// run scan
 async function runScan(domain){
   setStatus("Scanning...");
   setProgress(5);
@@ -381,6 +404,28 @@ ${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
     setProgress(0);
     document.getElementById("scanOut").innerHTML = "<pre>Scan failed. Try another target.</pre>";
   }
+}
+
+// admin detect
+async function adminDetect(domain){
+  setStatus("Detecting admin login...");
+  const results=[];
+  let total=adminPaths.length;
+  for(let i=0;i<total;i++){
+    const p = adminPaths[i];
+    try{
+      const res = await timeoutFetch(PROXY + "http://" + domain + p, 5000);
+      const ok = res.status===200 || (res.status>=300 && res.status<400);
+      results.push({path:p,status:res.status,ok});
+    }catch{
+      results.push({path:p,status:"fail",ok:false});
+    }
+    setProgress(Math.round(((i+1)/total)*100));
+  }
+  setStatus("Admin detect finished.");
+
+  const found = results.filter(x=>x.ok);
+  document.getElementById("adminOut").innerHTML = `<pre>${found.length ? "FOUND:\n" + found.map(x=>`${x.path} => ${x.status}`).join("\n") : "No admin login detected."}\n\nALL:\n${results.map(x=>`${x.path} => ${x.status}`).join("\n")}</pre>`;
 }
 
 // lab
@@ -468,6 +513,11 @@ document.getElementById("scanBtn").addEventListener("click", ()=>{
 });
 document.getElementById("labRun").addEventListener("click", labRun);
 document.getElementById("labValidate").addEventListener("click", labValidate);
+document.getElementById("adminBtn").addEventListener("click", ()=>{
+  const domain = clean(document.getElementById("adminTarget").value);
+  if(!domain){ setStatus("Target required."); return; }
+  adminDetect(domain);
+});
 
 // initial
 setProgress(0);
