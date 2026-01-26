@@ -3,44 +3,71 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan</title>
-
+<title>ORCA WebScan (Lab Mode)</title>
 <style>
 :root{
   --navy:#0b1d3a;--white:#fff;--gray:#f4f6fb;
   --border:#e0e6f2;--ok:#0a6;--warn:#a80;--err:#a00;
 }
 body{margin:0;font-family:system-ui;background:var(--gray)}
-.container{max-width:900px;margin:auto;padding:20px}
+.container{max-width:980px;margin:auto;padding:20px}
 .card{background:#fff;border-radius:14px;padding:20px;border:1px solid var(--border)}
 h1{text-align:center;color:var(--navy)}
-input,button{padding:12px;font-size:16px;border-radius:10px;border:1px solid var(--border)}
+input,button,textarea,select{padding:12px;font-size:16px;border-radius:10px;border:1px solid var(--border);width:100%;box-sizing:border-box}
 button{background:var(--navy);color:#fff;cursor:pointer}
 pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
 .badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px;margin-left:6px}
 .ok{background:#d4f8e8;color:var(--ok)}
 .warn{background:#fff4cc;color:var(--warn)}
 .err{background:#ffd6d6;color:var(--err)}
-small{color:#666}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.section{border:1px solid var(--border);padding:12px;border-radius:12px;background:#fff}
+.section h2{margin:0 0 8px 0;font-size:16px;color:var(--navy)}
+.small{color:#666;font-size:13px}
+.progress{height:10px;background:#e9edf7;border-radius:6px;overflow:hidden;margin:10px 0}
+.progress > div{height:100%;width:0;background:var(--navy)}
 </style>
 </head>
-
 <body>
 <div class="container">
-<h1>ORCA WebScan</h1>
+  <h1>ORCA WebScan (Lab Mode)</h1>
+  <div class="card">
+    <p><small class="small">⚠️ Only scan targets you own or have explicit permission to test. Lab mode is for your own environment.</small></p>
 
-<div class="card">
-<p><small>⚠️ Scan only domains you own or have permission to test.</small></p>
-<input id="target" placeholder="domain.com">
-<button onclick="run()">Scan</button>
-<pre id="out"></pre>
-</div>
+    <input id="target" placeholder="domain.com" autofocus>
+    <button id="btn" onclick="run()">Scan</button>
+
+    <div class="progress"><div id="bar"></div></div>
+
+    <div class="grid">
+      <div class="section" id="output"></div>
+      <div class="section" id="details"></div>
+    </div>
+
+    <div class="section" style="margin-top:16px;">
+      <h2>Lab Mode: Verify Exploit (Your Payload)</h2>
+      <label>Endpoint (relative or absolute):</label>
+      <input id="labEndpoint" placeholder="/vulnerable?cmd=">
+
+      <label>Method:</label>
+      <select id="labMethod">
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+      </select>
+
+      <label>Payload (you provide):</label>
+      <textarea id="labPayload" rows="3" placeholder="e.g. id, ls, whoami, etc"></textarea>
+
+      <button onclick="labTest()">Run Lab Test</button>
+      <pre id="labOut"></pre>
+    </div>
+
+  </div>
 </div>
 
 <script>
 const PROXY="https://r.jina.ai/http://";
 const ports=[80,443,8080,8443];
-
 const headersCheck=[
   "content-security-policy",
   "strict-transport-security",
@@ -50,10 +77,10 @@ const headersCheck=[
   "permissions-policy"
 ];
 
-function clean(d){
-  return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');
-}
-function section(t,b){return `\n=== ${t} ===\n${b}\n`; }
+function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
+function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
+function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
+function section(title,html){ return `<h2>${title}</h2>${html}`; }
 
 async function timeoutFetch(url,ms=8000){
   const c=new AbortController();
@@ -109,16 +136,25 @@ async function scanDNS(domain){
   return out;
 }
 
-/* ---------- SUBDOMAIN (PASSIVE) ---------- */
+/* ---------- SUBDOMAIN (CRT.SH + fallback) ---------- */
 async function subdomains(domain){
+  let list=[];
   try{
     const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
     const j=await r.json();
-    return [...new Set(j.map(x=>x.name_value))].slice(0,20);
-  }catch{return [];}
+    list = [...new Set(j.map(x=>x.name_value))];
+  }catch(e){
+    list=[];
+  }
+  try{
+    const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
+    const j=await r.json();
+    if(j.Answer) list.push(domain);
+  }catch{}
+  return [...new Set(list)].slice(0,30);
 }
 
-/* ---------- PORT CHECK ---------- */
+/* ---------- PORT CHECK (browser-limited) ---------- */
 async function scanPorts(domain){
   let res={};
   for(const p of ports){
@@ -146,7 +182,6 @@ function detectWAF(headers, body){
   if(waf.length){
     level = waf.some(x=>["Cloudflare","Akamai","Imperva"].includes(x)) ? "High" : "Medium";
   }
-
   return {vendors:[...new Set(waf)], level};
 }
 
@@ -190,6 +225,30 @@ function sqliIndicators(http){
   return issues;
 }
 
+/* ---------- RCE INDICATORS (passive) ---------- */
+function rceIndicators(http){
+  const issues=[];
+  const body=http.body||"";
+
+  const patterns=[
+    /command not found/i,
+    /popen\(/i,
+    /exec\(/i,
+    /system\(/i,
+    /shell_exec\(/i,
+    /Permission denied/i,
+    /cannot execute/i
+  ];
+
+  if(patterns.some(r=>r.test(body)))
+    issues.push("Command execution error pattern in response");
+
+  if(http.url.includes("cmd=") || http.url.includes("exec=") || http.url.includes("command="))
+    issues.push("Command-like parameter name detected");
+
+  return issues;
+}
+
 /* ---------- FORM / CSRF SIGNAL ---------- */
 function formIssues(body){
   const issues=[];
@@ -201,11 +260,32 @@ function formIssues(body){
   return issues;
 }
 
+/* ---------- ADMIN LOGIN DETECTION ---------- */
+const adminPaths = [
+  "/wp-admin/", "/administrator/", "/user/login", "/admin", "/login",
+  "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin"
+];
+
+async function detectAdmin(domain){
+  const found=[];
+  for(const p of adminPaths){
+    try{
+      const r = await timeoutFetch(PROXY + "http://" + domain + p, 4000);
+      const t = await r.text();
+      if(r.status === 200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password"))){
+        found.push(p);
+      }
+    }catch{}
+  }
+  return [...new Set(found)];
+}
+
 /* ---------- OWASP MAPPING ---------- */
 function owaspMap(r){
   const map=[];
   if(r.sqli?.length) map.push("A03: Injection (indicator)");
   if(r.xss?.length) map.push("A03: Injection (XSS indicator)");
+  if(r.rce?.length) map.push("A01: Broken Access Control (RCE indicator)");
   if(r.headers?.some(h=>!h.ok)) map.push("A05: Security Misconfiguration");
   if(r.forms?.length) map.push("A08: CSRF (signal)");
   return [...new Set(map)];
@@ -220,63 +300,133 @@ function risk(r){
   if(r.waf.level==="High") s+=10;
   if(r.xss.length) s+=10;
   if(r.sqli.length) s+=10;
+  if(r.rce.length) s+=10;
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
 /* ---------- RUN ---------- */
 async function run(){
-  const out=document.getElementById("out");
-  out.textContent="Scanning...\n";
-
+  const out=document.getElementById("output");
+  const det=document.getElementById("details");
   const domain=clean(document.getElementById("target").value);
   if(!domain) return;
+
+  setProgress(5);
+  out.innerHTML = "<b>Scanning...</b>";
 
   let r={};
 
   try{
     r.http=await scanHTTP(domain);
+    setProgress(20);
+
     r.tech=techFingerprint(r.http);
     r.headers=scanHeaders(r.http.headers);
-    r.dns=await scanDNS(domain);
-    r.subdomains=await subdomains(domain);
-    r.ports=await scanPorts(domain);
+    setProgress(30);
 
-    // NEW FEATURES
+    r.dns=await scanDNS(domain);
+    setProgress(40);
+
+    r.subdomains=await subdomains(domain);
+    setProgress(55);
+
+    r.ports=await scanPorts(domain);
+    setProgress(70);
+
     r.waf = detectWAF(r.http.headers, r.http.body);
     r.xss = xssIndicators(r.http);
     r.sqli = sqliIndicators(r.http);
+    r.rce = rceIndicators(r.http);
     r.forms = formIssues(r.http.body);
     r.owasp = owaspMap(r);
+    setProgress(80);
+
+    r.admin = await detectAdmin(domain);
+    setProgress(90);
 
     r.risk=risk(r);
+    setProgress(100);
   }catch(e){
-    out.textContent="Scan failed.";
+    out.innerHTML = "<b>Scan failed.</b><br><span class='small'>Possible CORS / Proxy limit.</span>";
+    setProgress(0);
     return;
   }
 
-  let txt="";
-  txt+=section("HTTP",`Status: ${r.http.status}\nHTTPS: ${r.http.https}`);
-  txt+=section("Tech",r.tech.join(", ")||"None");
-  txt+=section("Security Headers",
-    r.headers.map(h=>`${h.name}: ${h.ok?"OK":"MISSING"}`).join("\n")
-  );
-  txt+=section("WAF",
-    `Detected: ${r.waf.vendors.join(", ")||"None"}\nProtection: ${r.waf.level}`
-  );
-  txt+=section("XSS Indicators", r.xss.join("\n")||"None");
-  txt+=section("SQLi Indicators", r.sqli.join("\n")||"None");
-  txt+=section("Form Issues", r.forms.join("\n")||"None");
-  txt+=section("OWASP Mapping", r.owasp.join("\n")||"None");
-  txt+=section("DNS",
-    Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")}`).join("\n")
-  );
-  txt+=section("Subdomains",r.subdomains.join("\n")||"None");
-  txt+=section("Ports",
-    Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("\n")
-  );
-  txt+=section("Risk",`Level: ${r.risk.level}\nScore: ${r.risk.score}`);
+  out.innerHTML = `
+    ${section("HTTP", `
+      Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}<br>
+      HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
+    `)}
 
-  out.textContent=txt;
+    ${section("Tech", r.tech.join(", ")||"None")}
+
+    ${section("Security Headers", r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
+
+    ${section("WAF", `
+      Detected: ${r.waf.vendors.join(", ")||"None"}<br>
+      Protection: ${r.waf.level}
+    `)}
+
+    ${section("XSS Indicators", r.xss.join("<br>")||"None")}
+    ${section("SQLi Indicators", r.sqli.join("<br>")||"None")}
+    ${section("RCE Indicators", r.rce.join("<br>")||"None")}
+    ${section("Form Issues", r.forms.join("<br>")||"None")}
+    ${section("OWASP Mapping", r.owasp.join("<br>")||"None")}
+    ${section("Admin Login Paths", r.admin.join("<br>")||"None")}
+  `;
+
+  det.innerHTML = `
+    ${section("DNS", Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))}
+    ${section("Subdomains", r.subdomains.join("<br>")||"None")}
+    ${section("Ports", Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"))}
+    ${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
+  `;
+}
+
+/* Enter key */
+document.getElementById("target").addEventListener("keydown", function(e){
+  if(e.key === "Enter") run();
+});
+
+/* ---------- LAB TEST ---------- */
+async function labTest(){
+  const domain=clean(document.getElementById("target").value);
+  if(!domain){
+    document.getElementById("labOut").textContent="Enter target domain first.";
+    return;
+  }
+
+  const ep=document.getElementById("labEndpoint").value.trim();
+  const method=document.getElementById("labMethod").value;
+  const payload=document.getElementById("labPayload").value.trim();
+
+  if(!ep || !payload){
+    document.getElementById("labOut").textContent="Endpoint and payload required.";
+    return;
+  }
+
+  const url = PROXY + "http://" + domain + ep + (method==="GET" ? encodeURIComponent(payload) : "");
+  let res, text;
+
+  try{
+    if(method==="GET"){
+      res = await timeoutFetch(url, 8000);
+      text = await res.text();
+    } else {
+      res = await timeoutFetch(PROXY + "http://" + domain + ep, 8000);
+      text = await res.text();
+    }
+
+    document.getElementById("labOut").textContent = `
+Status: ${res.status}
+URL: ${res.url}
+Response snippet:
+${text.slice(0, 500)}
+    `.trim();
+
+  }catch(e){
+    document.getElementById("labOut").textContent="Lab request failed (CORS/proxy/timeout).";
+  }
 }
 </script>
 </body>
