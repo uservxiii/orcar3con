@@ -2,151 +2,195 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress LAB (Final)</title>
+<title>ORCA WebScan – WordPress LAB</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body{margin:0;font-family:system-ui;background:#0b1220;color:#e9efff}
-.container{max-width:1200px;margin:auto;padding:20px}
-.card{background:#121a2c;border-radius:16px;padding:18px;margin-bottom:16px}
-input,button{padding:12px;border-radius:10px;border:none;font-size:16px}
-input{width:70%}
-button{background:#4f7cff;color:#fff;cursor:pointer}
-pre{background:#0a1020;padding:14px;border-radius:10px;overflow:auto;white-space:pre-wrap}
-h1{margin-top:0}
-.tag{font-size:12px;padding:3px 6px;border-radius:6px}
-.ok{background:#0a6}
-.warn{background:#a80}
-.err{background:#a00}
+:root{
+  --bg:#0b1220;
+  --panel:#121a2c;
+  --text:#e9efff;
+  --accent:#4f7cff;
+}
+.light{
+  --bg:#f4f6fb;
+  --panel:#ffffff;
+  --text:#0b1220;
+  --accent:#3b6cff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:system-ui;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  height:100vh;
+}
+.sidebar{
+  width:220px;
+  background:var(--panel);
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.sidebar h2{margin:0 0 10px 0}
+.sidebar button{
+  padding:12px;
+  border-radius:12px;
+  border:none;
+  background:var(--accent);
+  color:#fff;
+  cursor:pointer;
+}
+.sidebar .ghost{
+  background:transparent;
+  color:var(--text);
+  border:1px solid var(--accent);
+}
+.main{
+  flex:1;
+  padding:24px;
+  overflow:auto;
+}
+.card{
+  background:var(--panel);
+  border-radius:18px;
+  padding:18px;
+  margin-bottom:16px;
+}
+input{
+  width:100%;
+  padding:14px;
+  font-size:16px;
+  border-radius:12px;
+  border:none;
+}
+pre{
+  background:#0a1020;
+  color:#cde;
+  padding:16px;
+  border-radius:14px;
+  white-space:pre-wrap;
+}
+.light pre{background:#eef2ff;color:#111}
 </style>
 </head>
+
 <body>
 
-<div class="container">
-<h1>🛡️ ORCA WebScan – WordPress LAB (Final)</h1>
-
-<div class="card">
-<input id="target" placeholder="example.com">
-<button onclick="scan()">Scan</button>
+<div class="sidebar">
+  <h2>🛡️ ORCA</h2>
+  <button onclick="scan()">Scan Target</button>
+  <button class="ghost" onclick="rceLab()">RCE Validation (LAB)</button>
+  <button class="ghost" onclick="toggleTheme()">🌗 Light / Dark</button>
 </div>
 
-<div class="card">
-<pre id="out">Idle.</pre>
-</div>
+<div class="main">
+  <h1>ORCA WebScan – WordPress LAB</h1>
+
+  <div class="card">
+    <input id="target" placeholder="example.com (press ENTER)" />
+  </div>
+
+  <div class="card">
+    <pre id="out">Idle.</pre>
+  </div>
 </div>
 
 <script>
-// ================= CONFIG =================
-const PROXY = "https://r.jina.ai/http://";
+const PROXY="https://r.jina.ai/http://";
+const out=t=>document.getElementById("out").textContent=t;
+const clean=d=>d.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 
-// ================= HELPERS =================
-const clean = d=>d.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
-const out = t=>document.getElementById("out").textContent=t;
-
-async function hybridFetch(url, timeout=6000){
-  const ctrl = new AbortController();
-  setTimeout(()=>ctrl.abort(), timeout);
-
+async function hybridFetch(url,timeout=6000){
+  const c=new AbortController();
+  setTimeout(()=>c.abort(),timeout);
   try{
-    return {res: await fetch(url,{signal:ctrl.signal}), mode:"direct"};
+    return {res:await fetch(url,{signal:c.signal}),mode:"direct"};
   }catch{
     try{
-      return {res: await fetch(PROXY + url.replace(/^https?:\/\//,'')), mode:"proxy"};
-    }catch{
-      return null;
-    }
+      return {res:await fetch(PROXY+url.replace(/^https?:\/\//,'')),mode:"proxy"};
+    }catch{return null;}
   }
 }
 
-// ================= MAIN SCAN =================
-async function scan(){
-  const domain = clean(target.value.trim());
-  if(!domain) return;
+/* ENTER AUTO SCAN */
+target.addEventListener("keydown",e=>{
+  if(e.key==="Enter") scan();
+});
 
+async function scan(){
+  const domain=clean(target.value.trim());
+  if(!domain) return;
   out("Scanning...");
   let log=`Target\n------\n${domain}\n\n`;
-
   const base="https://"+domain;
 
-  // ===== Homepage =====
-  const home = await hybridFetch(base);
-  if(!home){ out("Target unreachable."); return; }
+  const home=await hybridFetch(base);
+  if(!home){out("Target unreachable");return;}
 
-  const html = await home.res.text();
-  log+=`Fetch Mode\n----------\n${home.mode==="proxy"?"Proxy (CORS-safe)":"Direct"}\n\n`;
+  const html=await home.res.text();
+  log+=`Fetch Mode\n----------\n${home.mode}\n\n`;
 
-  // ===== WordPress detect =====
   const isWP=/wp-content|wp-includes/i.test(html);
   log+=`WordPress Detected\n------------------\n${isWP?"YES":"NO"}\n\n`;
 
-  // ===== Admin login paths =====
   log+="Admin Login Paths\n-----------------\n";
   for(const p of ["/wp-login.php","/wp-admin/"]){
     const r=await hybridFetch(base+p);
     log+=`${p} => ${r?r.res.status:"blocked"}\n`;
   }
 
-  // ===== XML-RPC =====
   const xr=await hybridFetch(base+"/xmlrpc.php");
   log+=`\nXML-RPC\n-------\n${xr?xr.res.status:"blocked"}\n`;
 
-  // ===== wp-json mapper =====
-  log+="\nwp-json Mapper\n--------------\n";
-  const restUsers = await hybridFetch(base+"/wp-json/wp/v2/users");
-  log+=`/wp-json/ => ${ (await hybridFetch(base+"/wp-json/"))?.res.status || "blocked" }\n`;
-  log+=`/wp-json/wp/v2/users => ${restUsers?restUsers.res.status:"blocked"}\n`;
+  log+="\nwp-json\n-------\n";
+  const rest=await hybridFetch(base+"/wp-json/wp/v2/users");
+  log+=`/wp-json/wp/v2/users => ${rest?rest.res.status:"blocked"}\n`;
 
-  // ===== USER ENUM LOGIC (REALISTIC) =====
-  log+="\nUser Enumeration (Passive)\n-------------------------\n";
-
-  let userStatus="Protected";
-  let userDetails=[];
-
-  if(restUsers && restUsers.res.status===200){
+  log+="\nUser Enumeration\n----------------\n";
+  if(rest && rest.res.status===200){
     try{
-      const data = await restUsers.res.json();
-      if(Array.isArray(data) && data.length>0){
-        userStatus="Exposed (REST API)";
-        data.forEach(u=>{
-          userDetails.push(`id:${u.id} | name:${u.name} | slug:${u.slug}`);
-        });
-      }else{
-        userStatus="Restricted (REST API open, users hidden)";
-      }
-    }catch{
-      userStatus="Restricted (REST API filtered)";
-    }
-  }
+      const d=await rest.res.json();
+      if(d.length){
+        log+="Exposed (REST API)\n";
+        d.forEach(u=>log+=` - ${u.slug}\n`);
+      }else log+="Restricted\n";
+    }catch{log+="Filtered\n";}
+  }else log+="Protected\n";
 
-  // author enum check
-  const authorTest = await hybridFetch(base+"/?author=1");
-  if(authorTest && authorTest.res.url.includes("/author/")){
-    userStatus = userStatus==="Protected" ? "Exposed (Author Archive)" : userStatus;
-    userDetails.push("Author archive redirect detected");
-  }
-
-  log+=`Status: ${userStatus}\n`;
-  if(userDetails.length){
-    log+="Details:\n"+userDetails.map(x=>" - "+x).join("\n")+"\n";
-  }
-
-  // ===== Plugin detect =====
   const plugins=[...new Set(
     [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)].map(m=>m[1])
   )];
-  log+="\nPlugins Detected\n----------------\n";
-  log+=plugins.length?plugins.join(", ")+"\n":"None\n";
-
-  // ===== Conclusion =====
-  log+=`\nConclusion\n----------\n`;
-  if(userStatus.startsWith("Exposed")){
-    log+="Passive user information exposure detected.\n";
-  }else{
-    log+="No passive admin username exposure detected.\n";
-  }
+  log+="\nPlugins\n-------\n"+(plugins.join(", ")||"None")+"\n";
 
   log+="\nScan Mode\n---------\nHybrid Passive LAB Scan\n";
   out(log);
 }
+
+/* RCE LAB BUTTON */
+function rceLab(){
+  out(
+`RCE Validation Module
+---------------------
+Status : LAB MODE
+Type   : Passive simulation only
+
+• No payload execution
+• No exploitation
+• For learning & validation design
+
+(coming soon)`
+  );
+}
+
+/* THEME */
+function toggleTheme(){
+  document.body.classList.toggle("light");
+}
 </script>
+
 </body>
 </html>
