@@ -195,6 +195,21 @@ pre{
     </div>
 
     <div class="section" style="margin-top:16px;">
+      <h2>Directory Finder</h2>
+
+      <label>Use default wordlist:</label>
+      <button onclick="runDirScan(true)">Run Default</button>
+
+      <label>Or upload your own wordlist (one per line):</label>
+      <input type="file" id="wordlistFile" accept=".txt">
+      <div class="row" style="margin-top:10px;">
+        <button onclick="runDirScan(false)">Run Uploaded</button>
+      </div>
+
+      <pre id="dirOut">No scan yet.</pre>
+    </div>
+
+    <div class="section" style="margin-top:16px;">
       <h2>Scan History</h2>
       <pre id="historyOut">No history yet.</pre>
       <button onclick="clearHistory()">Clear History</button>
@@ -407,7 +422,6 @@ function sqliIndicators(http){
   if(err.some(r=>r.test(body)))
     issues.push("SQL error pattern in response");
 
-  // detect suspicious query params
   const url = http.url || "";
   const hasParams = url.includes("?");
   if(hasParams){
@@ -456,7 +470,9 @@ const adminPaths = [
   "/wp-admin/", "/administrator/", "/user/login", "/admin", "/login",
   "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin",
   "/cpanel", "/manager/html", "/admin/login.php", "/admin/index.php",
-  "/user", "/admin/dashboard", "/admin/home", "/backend", "/adminpanel.php"
+  "/user", "/admin/dashboard", "/admin/home", "/backend", "/adminpanel.php",
+  "/admin/login", "/admin/login.html", "/login.php", "/login.html",
+  "/administrator/index.php", "/user/login.php", "/administer"
 ];
 
 async function detectAdmin(domain){
@@ -696,6 +712,83 @@ ${text.slice(0, 500)}
 
   }catch(e){
     document.getElementById("labOut").textContent="Validation failed (CORS/proxy/timeout).";
+  }
+}
+
+/* ----------------- DIRECTORY SCAN ----------------- */
+const defaultWordlist = [
+  "admin",
+  "login",
+  "wp-login.php",
+  "wp-admin/",
+  "administrator/",
+  "phpunit.xml",
+  "vendor/phpunit/",
+  ".env",
+  "config.php",
+  "backup.zip",
+  "backup.tar.gz",
+  "phpinfo.php",
+  "test.php",
+  "debug.php",
+  "admin.php",
+  "cpanel",
+  "webmail",
+  "manager/html",
+  "adminpanel",
+  "dashboard",
+  "admin/login",
+  "user/login",
+  "api",
+  "api/v1",
+  "api/v2",
+  "uploads",
+  "upload",
+  "files",
+  "backup",
+  "backup_old",
+  "old",
+  "staging",
+  "dev",
+  "test",
+];
+
+async function runDirScan(useDefault){
+  const domain = clean(document.getElementById("target").value);
+  if(!domain){
+    document.getElementById("dirOut").textContent="Enter target domain first.";
+    return;
+  }
+
+  let list = [];
+  if(useDefault){
+    list = defaultWordlist;
+  }else{
+    const file = document.getElementById("wordlistFile").files[0];
+    if(!file){
+      document.getElementById("dirOut").textContent="Please upload a wordlist file.";
+      return;
+    }
+    const text = await file.text();
+    list = text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  }
+
+  document.getElementById("dirOut").textContent="Scanning directories...\n";
+  let found = [];
+
+  for(let i=0; i<list.length; i++){
+    const path = list[i].startsWith("/") ? list[i] : "/" + list[i];
+    try{
+      const r = await timeoutFetch(PROXY + "http://" + domain + path, 4000);
+      if(r.status === 200){
+        found.push(path);
+        document.getElementById("dirOut").textContent += `FOUND: ${path}\n`;
+      }
+    }catch{}
+  }
+
+  if(!found.length){
+    document.getElementById("dirOut").textContent += "No directories found (or blocked by WAF/proxy).";
   }
 }
 </script>
