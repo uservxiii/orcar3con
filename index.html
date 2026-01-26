@@ -19,6 +19,10 @@ input{width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:8px}
 pre{background:#0a1020;color:#cde;padding:16px;border-radius:14px;white-space:pre-wrap}
 .light pre{background:#eef2ff;color:#111}
 small{opacity:.7}
+.tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:12px;margin-left:6px}
+.low{background:#2b5}
+.med{background:#e9a93a}
+.high{background:#e55353}
 </style>
 </head>
 
@@ -36,7 +40,7 @@ small{opacity:.7}
 
   <div class="card">
     <input id="target" placeholder="https://example.com (ENTER)">
-    <small>Passive scan · LAB SAFE MODE</small>
+    <small>Passive scan · SAFE MODE · No exploitation</small>
   </div>
 
   <div class="card" id="brute" style="display:none">
@@ -70,7 +74,39 @@ async function fetchSafe(u){
   try{return await fetch(u,{redirect:"manual"});}catch{return null;}
 }
 
-/* ================= SCAN (dipersingkat, sama seperti sebelumnya) ================= */
+/* ================= PLUGIN RCE FINGERPRINT DB (SAFE) ================= */
+const pluginFingerprints=[
+  {
+    plugin:"revslider",
+    path:"/wp-content/plugins/revslider/",
+    hints:["upload","zip","slider"],
+    cves:["CVE-2014-9734"],
+    risk:"HIGH"
+  },
+  {
+    plugin:"wp-file-manager",
+    path:"/wp-content/plugins/wp-file-manager/",
+    hints:["connector","elfinder"],
+    cves:["CVE-2020-25213"],
+    risk:"HIGH"
+  },
+  {
+    plugin:"elementor",
+    path:"/wp-content/plugins/elementor/",
+    hints:["ajax","editor"],
+    cves:["CVE-2023-48777"],
+    risk:"MEDIUM"
+  }
+];
+
+/* ================= CVE MATCHER (OFFLINE DEMO) ================= */
+const cveDB={
+  "CVE-2014-9734":"RevSlider arbitrary file upload leading to RCE",
+  "CVE-2020-25213":"WP File Manager unauthenticated RCE",
+  "CVE-2023-48777":"Elementor RCE via template import"
+};
+
+/* ================= SCAN ================= */
 async function scan(){
   const base=target.value.replace(/\/$/,"");
   if(!base)return;
@@ -80,16 +116,56 @@ async function scan(){
   if(!home){out("Target unreachable");return;}
   const html=await home.text();
 
-  add("Target\n------\n"+base+"\n");
+  add("Target\n------");
+  add(base+"\n");
 
   add("Server / CDN\n------------");
-  add(home.headers.get("server")||"hidden");
+  const server=home.headers.get("server")||"hidden";
+  add(server);
   if(home.headers.get("cf-ray")) add("Cloudflare detected");
   add("");
 
   add("WordPress\n----------");
   add(/wp-content|wp-includes/i.test(html)?"YES":"NO");
+  add("");
+
+  await pluginFingerprint(base);
   add("\nScan completed.");
+}
+
+/* ================= PLUGIN RCE FINGERPRINT ================= */
+async function pluginFingerprint(base){
+  add("Plugin RCE Fingerprint\n----------------------");
+  let found=0;
+
+  for(const p of pluginFingerprints){
+    const r=await fetchSafe(base+p.path);
+    if(!r) continue;
+
+    let confidence="LOW";
+    if(r.status===200) confidence="MEDIUM";
+    if(r.status===200 && p.risk==="HIGH") confidence="HIGH";
+
+    found++;
+    add(
+      `Plugin : ${p.plugin}
+Path   : ${p.path}
+Risk   : ${p.risk}
+Confidence : ${confidence}
+CVE    : ${p.cves.join(", ")}`
+    );
+
+    p.cves.forEach(c=>{
+      if(cveDB[c]){
+        add(` ↳ ${c} : ${cveDB[c]}`);
+      }
+    });
+    add("");
+  }
+
+  if(!found){
+    add("No known vulnerable plugin fingerprint detected");
+  }
 }
 
 /* ================= RCE VALIDATION ================= */
@@ -101,42 +177,34 @@ async function rceValidate(){
   const tests=[
     "/?cmd=id",
     "/?exec=whoami",
-    "/wp-admin/admin-ajax.php?action=test",
-    "/wp-content/plugins/"
+    "/wp-admin/admin-ajax.php?action=test"
   ];
 
-  let hits=0;
+  let score=0;
 
   for(const t of tests){
     const r=await fetchSafe(base+t);
     if(!r){ add(`${t} → blocked`); continue; }
-
     const txt=await r.text();
     let flag="OK";
+    let conf="LOW";
 
-    if(/uid=|gid=|root:/i.test(txt)) flag="⚠️ EXECUTION STRING";
-    else if(/warning|fatal error|undefined/i.test(txt)) flag="⚠️ ERROR LEAK";
-    else if(r.status===200 && txt.length>1000) flag="⚠️ UNEXPECTED RESPONSE";
+    if(/uid=|gid=|root:/i.test(txt)){flag="EXEC STRING";conf="HIGH";score+=3;}
+    else if(/warning|fatal error/i.test(txt)){flag="ERROR LEAK";conf="MEDIUM";score+=2;}
+    else if(r.status===200){flag="UNEXPECTED RESPONSE";conf="LOW";score+=1;}
 
-    if(flag!=="OK") hits++;
-
-    add(`${t} → ${r.status} ${flag}`);
+    add(`${t} → ${flag} [${conf}]`);
   }
 
-  add("\nResult");
-  add("------");
-  if(hits>=2){
-    add("LIKELY VULNERABLE (manual verification required)");
-  }else if(hits===1){
-    add("POTENTIAL – needs deeper analysis");
-  }else{
-    add("No RCE indication");
-  }
+  add("\nResult\n------");
+  if(score>=5) add("LIKELY VULNERABLE (HIGH confidence)");
+  else if(score>=2) add("POTENTIAL (MEDIUM confidence)");
+  else add("No RCE indication (LOW confidence)");
 
   add("\nSAFE MODE – no payload executed");
 }
 
-/* ================= BRUTE ================= */
+/* ================= BRUTE LAB ================= */
 let uWL=[],pWL=[];
 userWL.onchange=e=>{
   const r=new FileReader();
