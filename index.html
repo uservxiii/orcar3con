@@ -1,44 +1,71 @@
+<?php
+/* =========================
+   SIMPLE PHP PROXY ENGINE
+========================= */
+function http_get($url){
+  $ch = curl_init($url);
+  curl_setopt_array($ch,[
+    CURLOPT_RETURNTRANSFER=>true,
+    CURLOPT_FOLLOWLOCATION=>true,
+    CURLOPT_USERAGENT=>"ORCA-WebScan",
+    CURLOPT_TIMEOUT=>15,
+    CURLOPT_SSL_VERIFYPEER=>false
+  ]);
+  $body = curl_exec($ch);
+  $info = curl_getinfo($ch);
+  curl_close($ch);
+  return [$body,$info];
+}
+
+if(isset($_GET['fetch'])){
+  [$b,$i]=http_get($_GET['fetch']);
+  http_response_code($i['http_code']??200);
+  header("Content-Type:text/plain");
+  echo $b;
+  exit;
+}
+?>
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <title>ORCA WebScan</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width">
 <style>
-body{margin:0;font-family:monospace;background:#0b1220;color:#e9efff}
-.container{padding:20px;max-width:1100px;margin:auto}
-input,button{padding:10px;font-family:monospace}
+body{margin:0;background:#0b1220;color:#e9efff;font-family:monospace}
+.wrap{max-width:1100px;margin:auto;padding:20px}
+input,button{font-family:monospace;padding:10px}
 button{cursor:pointer}
 pre{background:#050814;padding:16px;border-radius:8px;white-space:pre-wrap}
-h1{margin-top:0}
 </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
 <h1>ORCA WebScan</h1>
 
-<input id="target" placeholder="https://target.tld" style="width:70%">
+<input id="t" placeholder="https://target.tld" style="width:70%">
 <button onclick="scan()">SCAN</button>
 
 <pre id="out">Idle.</pre>
 </div>
 
 <script>
-const out = document.getElementById("out");
-const log = [];
-const add = t => log.push(t);
-const render = () => out.textContent = log.join("\n");
-const clear = () => log.length = 0;
+const out=document.getElementById("out");
+const log=[];
+const add=t=>log.push(t);
+const render=()=>out.textContent=log.join("\n");
+const clear=()=>log.length=0;
 
-async function proxy(url){
-  const r = await fetch("proxy.php?u="+encodeURIComponent(url));
+async function get(u){
+  const r=await fetch("?fetch="+encodeURIComponent(u));
   if(!r.ok) return null;
   return r;
 }
 
+/* ================= SCAN ================= */
 async function scan(){
   clear();
-  const base = document.getElementById("target").value.replace(/\/$/,"");
+  const base=document.getElementById("t").value.replace(/\/$/,"");
   if(!base) return;
 
   add("Scanning target");
@@ -46,22 +73,21 @@ async function scan(){
   add(base+"\n");
   render();
 
-  const res = await proxy(base);
-  if(!res){ add("Target unreachable"); return render(); }
+  const r=await get(base);
+  if(!r){ add("Target unreachable"); return render(); }
 
-  const html = await res.text();
-  const server = res.headers.get("server") || "hidden";
+  const html=await r.text();
+  const server=r.headers.get("server")||"hidden";
 
   add("Server / CDN");
   add("------------");
   add(server+"\n");
 
-  /* CMS DETECTION */
-  let cms="Unknown";
+  /* CMS DETECT */
+  let cms="Static / Other";
   if(/wp-content|wp-includes|wordpress/i.test(html)) cms="WordPress";
   else if(/Joomla!|com_content/i.test(html)) cms="Joomla";
   else if(/Drupal.settings|drupal/i.test(html)) cms="Drupal";
-  else cms="Static / Other";
 
   add("CMS");
   add("---");
@@ -70,27 +96,24 @@ async function scan(){
   if(cms==="WordPress"){
     await wpUsers(base);
     await wpPlugins(html);
-  } else {
-    add("WP Modules Skipped (CMS not WordPress)");
   }
 
   add("\nScan completed.");
   render();
 }
 
-/* ================= WP USERS ================= */
+/* ================= USERS ================= */
 async function wpUsers(base){
   add("User Enumeration");
   add("-----------------");
 
-  const r = await proxy(base+"/wp-json/wp/v2/users");
+  const r=await get(base+"/wp-json/wp/v2/users");
   if(!r || r.status!==200){
     add("No users discovered\n");
     return;
   }
-
   try{
-    const j = await r.json();
+    const j=await r.json();
     if(!j.length){ add("No users discovered\n"); return; }
     j.forEach(u=>add("User: "+u.slug));
     add("");
@@ -99,43 +122,45 @@ async function wpUsers(base){
   }
 }
 
-/* ================= PLUGIN FINGERPRINT ================= */
-async function wpPlugins(html){
-  add("Plugin Fingerprint");
-  add("------------------");
+/* ================= PLUGINS ================= */
+const pluginDB={
+  "revslider":{
+    re:/revslider/i,
+    cves:[
+      ["CVE-2014-9734","RevSlider arbitrary file upload → RCE"]
+    ]
+  },
+  "wp-file-manager":{
+    re:/wp-file-manager/i,
+    cves:[
+      ["CVE-2020-25213","Unauthenticated file upload → RCE"]
+    ]
+  },
+  "elementor":{
+    re:/elementor/i,
+    cves:[
+      ["CVE-2023-48777","Template import → code execution"]
+    ]
+  }
+};
 
-  const plugins = {
-    "revslider": /revslider/i,
-    "wp-file-manager": /wp-file-manager/i,
-    "elementor": /elementor/i
-  };
+async function wpPlugins(html){
+  add("Plugin RCE Fingerprint");
+  add("----------------------");
 
   let found=false;
-
-  for(const p in plugins){
-    if(plugins[p].test(html)){
+  for(const p in pluginDB){
+    if(pluginDB[p].re.test(html)){
       found=true;
       add("Plugin : "+p);
-      await mapCVE(p);
+      pluginDB[p].cves.forEach(c=>{
+        add("CVE    : "+c[0]);
+        add(" ↳ "+c[1]);
+      });
       add("");
     }
   }
-
   if(!found) add("No plugin fingerprint detected\n");
-}
-
-/* ================= CVE MAP ================= */
-async function mapCVE(plugin){
-  const r = await fetch("cve-map.json");
-  const db = await r.json();
-  if(!db[plugin]){
-    add("CVE    : none mapped");
-    return;
-  }
-  db[plugin].forEach(c=>{
-    add("CVE    : "+c.id);
-    add(" ↳ "+c.desc);
-  });
 }
 </script>
 </body>
