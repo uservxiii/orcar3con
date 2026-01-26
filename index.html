@@ -3,332 +3,618 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan - NEW</title>
+<title>ORCA WebScan (New)</title>
 <style>
-:root{
-  --bg:#f6f8ff;
-  --card:#ffffff;
-  --text:#0b1d3a;
-  --muted:#5f6f89;
-  --border:#e0e6f2;
-  --shadow:0 10px 30px rgba(0,0,0,.08);
-  --primary:#0b1d3a;
-}
-[data-theme="dark"]{
-  --bg:#0b1020;
-  --card:#0f172a;
-  --text:#e9efff;
-  --muted:#aab6d1;
-  --border:#1b2436;
-  --shadow:0 12px 34px rgba(0,0,0,.55);
-}
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);}
-.container{display:flex;height:100vh;}
-.sidebar{width:260px;background:var(--card);border-right:1px solid var(--border);padding:20px;box-shadow:var(--shadow);}
-.brand{font-weight:800;font-size:18px;margin-bottom:18px;}
-.menu{list-style:none;padding:0;margin:0;}
-.menu li{margin-bottom:8px;}
-.menu button{
-  width:100%;
-  text-align:left;
-  padding:12px 14px;
-  border:none;
-  border-radius:12px;
-  background:transparent;
-  cursor:pointer;
-  font-size:15px;
-  color:var(--text);
-}
-.menu button.active{background:rgba(11,29,58,.08);}
-.main{flex:1;padding:20px;overflow:auto;}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-.header h1{margin:0;font-size:20px;}
-.btn{padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:var(--card);cursor:pointer;color:var(--text);}
-.btn.primary{background:var(--primary);color:#fff;border:none;}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
-input,textarea,select{padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);width:100%;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px;}
-pre{background:rgba(11,29,58,.06);padding:14px;border-radius:12px;overflow:auto;white-space:pre-wrap;}
-[data-theme="dark"] pre{background:rgba(233,239,255,.06);}
-.hidden{display:none;}
-.log{background:rgba(11,29,58,.05);padding:10px;border-radius:12px;height:120px;overflow:auto;font-size:13px;}
-[data-theme="dark"] .log{background:rgba(233,239,255,.05);}
-.progress{height:10px;background:rgba(11,29,58,.08);border-radius:12px;overflow:hidden;margin:10px 0 12px;}
-.progress>div{height:100%;width:0;background:var(--primary);}
-.footer{color:var(--muted);font-size:13px;margin-top:10px;text-align:center;}
+  :root{
+    --navy:#0b1d3a;
+    --white:#fff;
+    --gray:#f4f6fb;
+    --border:#e0e6f2;
+    --ok:#0a6;
+    --warn:#a80;
+    --err:#a00;
+    --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+  [data-theme="dark"]{
+    --navy:#e9efff;
+    --white:#0b1220;
+    --gray:#0a1020;
+    --border:#1b2436;
+    --shadow: 0 10px 26px rgba(0,0,0,0.4);
+  }
+  body{
+    margin:0;
+    font-family:system-ui;
+    background: linear-gradient(180deg, #f7f9ff 0%, #f4f6fb 100%);
+  }
+  [data-theme="dark"] body{
+    background: linear-gradient(180deg, #0a0f1f 0%, #0a1020 100%);
+  }
+  .app{
+    display:flex;
+    height:100vh;
+    overflow:hidden;
+  }
+  .sidebar{
+    width:280px;
+    background:var(--white);
+    border-right:1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding:20px;
+    box-sizing:border-box;
+  }
+  [data-theme="dark"] .sidebar{
+    background:#0f172a;
+    border-color:#1b2436;
+  }
+  .sidebar h1{
+    font-size:20px;
+    margin:0 0 10px 0;
+    color:var(--navy);
+  }
+  .sidebar .small{
+    font-size:13px;
+    color:#666;
+    margin:0 0 14px 0;
+  }
+  .sidebar button{
+    width:100%;
+    padding:12px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:var(--navy);
+    color:#fff;
+    cursor:pointer;
+    margin-bottom:10px;
+  }
+  .sidebar button:hover{ transform:translateY(-1px); }
+  .sidebar button:active{ transform:translateY(0); }
+  .sidebar .btn-secondary{
+    background:#fff;
+    color:var(--navy);
+  }
+  .sidebar .btn-secondary:hover{
+    background:#f4f6fb;
+  }
+  .main{
+    flex:1;
+    overflow:auto;
+    padding:20px;
+    box-sizing:border-box;
+  }
+  .tabs{
+    display:flex;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .tab{
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background:var(--white);
+    cursor:pointer;
+  }
+  .tab.active{
+    background:var(--navy);
+    color:#fff;
+    border-color:var(--navy);
+  }
+  [data-theme="dark"] .tab{
+    background:#0f172a;
+  }
+  .card{
+    background:var(--white);
+    border-radius:18px;
+    padding:20px;
+    border:1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  [data-theme="dark"] .card{
+    background:#0f172a;
+    border-color:#1b2436;
+  }
+  input,button,textarea,select{
+    padding:12px;
+    font-size:16px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    width:100%;
+    box-sizing:border-box;
+    background:var(--white);
+    color:var(--navy);
+  }
+  [data-theme="dark"] input,[data-theme="dark"] textarea,[data-theme="dark"] select{
+    background:#121a2c;
+    color:#e9efff;
+  }
+  .row{
+    display:flex;
+    gap:12px;
+    align-items:center;
+  }
+  .row > *{ flex:1; }
+  .row .w-30{ flex:0 0 30%; }
+  .row .w-70{ flex:0 0 70%; }
+  .badge{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:8px;
+    font-size:12px;
+    margin-left:6px;
+  }
+  .ok{ background:#d4f8e8; color:var(--ok); }
+  .warn{ background:#fff4cc; color:var(--warn); }
+  .err{ background:#ffd6d6; color:var(--err); }
+  pre{
+    background:#f7f9ff;
+    padding:15px;
+    border-radius:12px;
+    overflow:auto;
+    white-space:pre-wrap;
+    color:var(--navy);
+  }
+  [data-theme="dark"] pre{
+    background:#0f172a;
+    color:#e9efff;
+  }
+  .progress{
+    height:10px;
+    background:#e9edf7;
+    border-radius:8px;
+    overflow:hidden;
+    margin:10px 0 14px 0;
+  }
+  .progress > div{
+    height:100%;
+    width:0;
+    background:var(--navy);
+    transition: width .2s ease;
+  }
+  .footer{
+    margin-top:14px;
+    font-size:13px;
+    color:#666;
+    text-align:center;
+  }
+  [data-theme="dark"] .footer{ color:#b8c3d7; }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="app">
   <div class="sidebar">
-    <div class="brand">ORCA WebScan</div>
-    <ul class="menu">
-      <li><button class="active" data-tab="scan">Scan</button></li>
-      <li><button data-tab="lab">Lab</button></li>
-      <li><button data-tab="brute">Brute</button></li>
-      <li><button data-tab="history">History</button></li>
-    </ul>
-    <div style="margin-top:18px;">
-      <button class="btn" id="themeBtn">Toggle Theme</button>
-      <button class="btn" id="exportBtn">Export JSON</button>
-    </div>
+    <h1>ORCA WebScan</h1>
+    <p class="small">⚠️ Only scan targets you own or have permission to test.</p>
+    <button id="btnScan">Start Scan</button>
+    <button id="btnExport" class="btn-secondary">Export Report</button>
+    <button id="btnHistory" class="btn-secondary">Show History</button>
+    <button id="btnTheme" class="btn-secondary">Toggle Theme</button>
+    <hr>
+    <div class="small">Target:</div>
+    <input id="target" placeholder="example.com" />
+    <div class="progress"><div id="bar"></div></div>
+    <div class="small">Status:</div>
+    <pre id="status">Idle</pre>
   </div>
 
   <div class="main">
-    <div class="header">
-      <h1 id="title">Scan</h1>
+    <div class="tabs">
+      <div class="tab active" data-tab="scan">Scan</div>
+      <div class="tab" data-tab="lab">Lab</div>
+      <div class="tab" data-tab="history">History</div>
+    </div>
+
+    <div id="tab-scan" class="card tab-content">
+      <h2>Scan</h2>
       <div class="row">
-        <input id="target" placeholder="domain.com" style="width:260px">
-        <button class="btn primary" id="scanBtn">Scan</button>
+        <input id="scanTarget" placeholder="domain.com" />
+        <button id="scanBtn">Scan</button>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button id="btnScanQuick">Quick Scan</button>
+        <button id="btnScanDeep">Deep Scan</button>
+      </div>
+      <div id="scanOut" style="margin-top:12px;">
+        <pre>No scan yet.</pre>
       </div>
     </div>
 
-    <div class="progress"><div id="bar"></div></div>
-    <div class="log" id="statusLog"></div>
-
-    <!-- SCAN -->
-    <div id="tab-scan" class="tab">
-      <div class="card"><h2>Result</h2><div id="output">No scan yet</div></div>
-      <div class="card"><h2>Details</h2><div id="details">No details yet</div></div>
-    </div>
-
-    <!-- LAB -->
-    <div id="tab-lab" class="tab hidden">
-      <div class="card">
-        <h2>Lab</h2>
-        <div class="row">
-          <input id="labEndpoint" placeholder="/path?param=">
-          <select id="labMethod"><option>GET</option><option>POST</option></select>
-        </div>
-        <textarea id="labPayload" rows="4" placeholder="payload" style="margin-top:10px"></textarea>
-        <button class="btn primary" id="labRunBtn" style="margin-top:10px">Run</button>
+    <div id="tab-lab" class="card tab-content" style="display:none;">
+      <h2>Lab</h2>
+      <div class="row">
+        <input id="labEndpoint" placeholder="/path?param=" />
+        <select id="labMethod">
+          <option value="GET">GET</option>
+          <option value="POST">POST</option>
+        </select>
       </div>
-      <div class="card"><h2>Output</h2><pre id="labOut">No output yet</pre></div>
-    </div>
-
-    <!-- BRUTE -->
-    <div id="tab-brute" class="tab hidden">
-      <div class="card">
-        <h2>Admin Brute</h2>
-        <input type="file" id="adminWordlistFile">
-        <div class="row" style="margin-top:10px">
-          <button class="btn primary" id="adminBtn">Start</button>
-          <button class="btn" id="pauseAdminBtn">Pause</button>
-          <button class="btn" id="resumeAdminBtn">Resume</button>
-        </div>
-        <pre id="adminOut">No output yet</pre>
+      <div style="margin-top:12px;">
+        <textarea id="labPayload" rows="4" placeholder="payload"></textarea>
       </div>
-
-      <div class="card">
-        <h2>Dir Brute</h2>
-        <input type="file" id="dirWordlistFile">
-        <div class="row" style="margin-top:10px">
-          <button class="btn primary" id="dirBtn">Start</button>
-          <button class="btn" id="pauseDirBtn">Pause</button>
-          <button class="btn" id="resumeDirBtn">Resume</button>
-        </div>
-        <pre id="dirOut">No output yet</pre>
+      <div class="row" style="margin-top:12px;">
+        <button id="labRun">Run</button>
+        <button id="labValidate">Validate</button>
       </div>
-
-      <div class="card">
-        <h2>Sub Brute</h2>
-        <input type="file" id="subWordlistFile">
-        <div class="row" style="margin-top:10px">
-          <button class="btn primary" id="subBtn">Start</button>
-          <button class="btn" id="pauseSubBtn">Pause</button>
-          <button class="btn" id="resumeSubBtn">Resume</button>
-        </div>
-        <pre id="subOut">No output yet</pre>
+      <div id="labOut" style="margin-top:12px;">
+        <pre>No lab test yet.</pre>
       </div>
     </div>
 
-    <!-- HISTORY -->
-    <div id="tab-history" class="tab hidden">
-      <div class="card">
-        <h2>History</h2>
-        <button class="btn" id="clearHistoryBtn">Clear</button>
-        <pre id="historyOut">No history</pre>
+    <div id="tab-history" class="card tab-content" style="display:none;">
+      <h2>History</h2>
+      <div id="historyOut">
+        <pre>No history yet.</pre>
       </div>
     </div>
-
-    <div class="footer">ORCA WebScan • NEW version</div>
   </div>
 </div>
 
 <script>
-const PROXY = "https://r.jina.ai/http://"; // proxy (must be online)
+const PROXY = "https://r.jina.ai/http://";
+const ports = [80, 443, 8080, 8443];
 
 let lastReport = null;
-let bruteState = {
-  admin:{running:false,index:0,list:[],found:[]},
-  dir:{running:false,index:0,list:[],found:[]},
-  sub:{running:false,index:0,list:[],found:[]}
-};
 
-const el = {
-  bar:()=>document.getElementById("bar"),
-  output:()=>document.getElementById("output"),
-  details:()=>document.getElementById("details"),
-  log:()=>document.getElementById("statusLog"),
-  history:()=>document.getElementById("historyOut"),
-  labOut:()=>document.getElementById("labOut"),
-};
-
-function log(msg){
-  const l=el.log();
-  l.textContent=`${new Date().toLocaleTimeString()} - ${msg}\n` + l.textContent;
-}
+// helpers
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
-function setProgress(p){ el.bar().style.width = p + "%"; }
-function setTab(tab){
-  document.querySelectorAll(".menu button").forEach(b=>b.classList.remove("active"));
-  document.querySelector(`[data-tab="${tab}"]`).classList.add("active");
-  document.querySelectorAll(".tab").forEach(t=>t.classList.add("hidden"));
-  document.getElementById("tab-"+tab).classList.remove("hidden");
-  document.getElementById("title").textContent = tab.charAt(0).toUpperCase()+tab.slice(1);
+function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
+function setStatus(txt){ document.getElementById("status").textContent = txt; }
+function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
+function section(title, html){ return `<h3>${title}</h3>${html}`; }
+async function timeoutFetch(url, ms=8000){
+  const c = new AbortController();
+  setTimeout(()=>c.abort(), ms);
+  return fetch(url, {signal:c.signal});
 }
-function toggleTheme(){
-  const r=document.documentElement;
-  r.setAttribute("data-theme", r.getAttribute("data-theme")==="dark"?"light":"dark");
-}
-
-function saveHistory(r){
+function saveHistory(report){
   const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  h.unshift({time:new Date().toISOString(), report:r});
-  localStorage.setItem("orca_history", JSON.stringify(h.slice(0,20)));
+  h.unshift({time:new Date().toISOString(), report});
+  localStorage.setItem("orca_history", JSON.stringify(h.slice(0, 20)));
   renderHistory();
 }
 function renderHistory(){
   const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  el.history().textContent = h.length ? h.map(x=>`${x.time}\n${JSON.stringify(x.report,null,2)}`).join("\n\n") : "No history";
+  const out = document.getElementById("historyOut");
+  if(!h.length){
+    out.innerHTML = "<pre>No history yet.</pre>";
+    return;
+  }
+  out.innerHTML = "<pre>" + h.map(x=>`${x.time}\n${JSON.stringify(x.report, null, 2)}`).join("\n\n") + "</pre>";
 }
-function clearHistory(){
-  localStorage.removeItem("orca_history");
-  renderHistory();
+function exportReport(){
+  if(!lastReport){ alert("No report to export yet."); return; }
+  const blob = new Blob([JSON.stringify(lastReport, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "orca_report.json";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-async function timeoutFetch(url,ms=8000){
-  const c=new AbortController();
-  setTimeout(()=>c.abort(),ms);
-  return fetch(url,{signal:c.signal});
+// scan
+async function scanHTTP(domain){
+  const r = await timeoutFetch(PROXY + "http://" + domain);
+  const text = await r.text();
+  let headersObj = {};
+  r.headers.forEach((v,k)=> headersObj[k]=v);
+  return {status:r.status, url:r.url, headers:headersObj, body:text, https:r.url.startsWith("https")};
+}
+function techFingerprint(http){
+  const tech=[];
+  const body=http.body||"";
+  const server=http.headers["server"]||"";
+  const patterns=[
+    ["WordPress", /wp-content|wp-includes/i],
+    ["Joomla", /Joomla!/i],
+    ["Drupal", /drupal/i],
+    ["Magento", /Magento/i],
+    ["Shopify", /shopify/i],
+    ["Laravel", /laravel/i],
+    ["Express", /express/i],
+    ["Django", /django/i],
+    ["Ruby on Rails", /rails/i],
+    ["Next.js", /next\.js/i],
+    ["React", /react/i],
+    ["Angular", /angular/i]
+  ];
+  patterns.forEach(p=>{
+    if(p[1].test(body) || server.toLowerCase().includes(p[0].toLowerCase())){
+      tech.push(p[0]);
+    }
+  });
+  return [...new Set(tech)];
+}
+function scanHeaders(h){
+  const headersCheck=[
+    "content-security-policy",
+    "strict-transport-security",
+    "x-frame-options",
+    "x-content-type-options",
+    "referrer-policy",
+    "permissions-policy"
+  ];
+  return headersCheck.map(x=>({name:x,ok:!!h[x]}));
+}
+async function scanDNS(domain){
+  const types=["A","AAAA","MX","NS","TXT"];
+  let out={};
+  for(const t of types){
+    try{
+      const r=await fetch(`https://dns.google/resolve?name=${domain}&type=${t}`);
+      const j=await r.json();
+      out[t]=j.Answer?.map(x=>x.data)||[];
+    }catch{ out[t]=[]; }
+  }
+  return out;
+}
+async function scanPorts(domain){
+  let res={};
+  for(const p of ports){
+    try{
+      await timeoutFetch(`http://${domain}:${p}`,3000);
+      res[p]=true;
+    }catch{res[p]=false;}
+  }
+  return res;
+}
+function detectWAF(headers, body){
+  const waf=[];
+  const h=k=> (headers[k]||"").toLowerCase();
+  const b=(body||"").toLowerCase();
+  if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
+  if(h("x-sucuri-id")||b.includes("sucuri firewall")) waf.push("Sucuri");
+  if(h("x-akamai-transformed")||h("akamai-ghost")) waf.push("Akamai");
+  if(h("x-incapsula")||b.includes("incapsula")) waf.push("Imperva");
+  if(h("x-waf")||h("x-firewall")) waf.push("Generic WAF");
+  let level="None";
+  if(waf.length){
+    level = waf.some(x=>["Cloudflare","Akamai","Imperva"].includes(x)) ? "High" : "Medium";
+  }
+  return {vendors:[...new Set(waf)], level};
+}
+function xssIndicators(http){
+  const issues=[];
+  const h=http.headers;
+  const body=http.body||"";
+  if(!h["content-security-policy"]) issues.push("Missing CSP");
+  if(/<script[\s>]/i.test(body)) issues.push("Inline <script> present");
+  if(/innerHTML\s*=|document\.write|eval\(/i.test(body)) issues.push("DOM XSS sink pattern");
+  if(!h["x-xss-protection"]) issues.push("X-XSS-Protection missing (legacy)");
+  return issues;
+}
+function sqliIndicators(http){
+  const issues=[];
+  const body=http.body||"";
+  const err=[
+    /sql syntax/i,
+    /mysql_fetch|mysqli_/i,
+    /ORA-\d+/i,
+    /ODBC SQL Server/i,
+    /Unclosed quotation mark/i,
+    /SQLite\/JDBC/i,
+    /syntax error at or near/i
+  ];
+  if(err.some(r=>r.test(body))) issues.push("SQL error pattern in response");
+  const url = http.url || "";
+  const hasParams = url.includes("?");
+  if(hasParams){
+    const params = url.split("?")[1];
+    if(/('|%27|--|;|or%20|and%20)/i.test(params))
+      issues.push("Suspicious SQL chars in URL parameters");
+  }
+  return issues;
+}
+function rceIndicators(http){
+  const issues=[];
+  const body=http.body||"";
+  const patterns=[
+    /command not found/i,
+    /popen\(/i,
+    /exec\(/i,
+    /system\(/i,
+    /shell_exec\(/i,
+    /Permission denied/i,
+    /cannot execute/i
+  ];
+  if(patterns.some(r=>r.test(body))) issues.push("Command execution error pattern in response");
+  if(http.url.includes("cmd=") || http.url.includes("exec=") || http.url.includes("command="))
+    issues.push("Command-like parameter name detected");
+  return issues;
+}
+function formIssues(body){
+  const issues=[];
+  const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
+  forms.forEach(f=>{
+    if(!/csrf|token/i.test(f[0]))
+      issues.push("Form without CSRF token");
+  });
+  return issues;
+}
+function detectCMSVersion(body){
+  const v=[];
+  const wp = body.match(/wp-content\/themes\/[^\/]+\/style\.css.*?Version:\s*([0-9.]+)/i);
+  if(wp) v.push(`WordPress: ${wp[1]}`);
+  const joomla = body.match(/content="Joomla! - Open Source Content Management".*?version\s*([0-9.]+)/i);
+  if(joomla) v.push(`Joomla: ${joomla[1]}`);
+  const drupal = body.match(/name="Generator" content="Drupal ([0-9.]+)"/i);
+  if(drupal) v.push(`Drupal: ${drupal[1]}`);
+  return v;
+}
+function owaspMap(r){
+  const map=[];
+  if(r.sqli?.length) map.push("A03: Injection (indicator)");
+  if(r.xss?.length) map.push("A03: Injection (XSS indicator)");
+  if(r.rce?.length) map.push("A01: Broken Access Control (RCE indicator)");
+  if(r.headers?.some(h=>!h.ok)) map.push("A05: Security Misconfiguration");
+  if(r.forms?.length) map.push("A08: CSRF (signal)");
+  return [...new Set(map)];
+}
+function risk(r){
+  let s=0;
+  if(!r.http.https) s+=20;
+  if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
+  if(r.tech.includes("WordPress")) s+=5;
+  if(r.waf.level==="High") s+=10;
+  if(r.xss.length) s+=10;
+  if(r.sqli.length) s+=10;
+  if(r.rce.length) s+=10;
+  return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
-async function scan(){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){ log("Target empty"); return; }
-  log("Scan started");
-  setProgress(10);
-
+// run
+async function runScan(domain){
+  setStatus("Scanning...");
+  setProgress(5);
   try{
-    const res = await timeoutFetch(PROXY + domain, 10000);
-    const body = await res.text();
-
-    lastReport = {
-      status: res.status,
-      url: res.url,
-      headers: Object.fromEntries(res.headers.entries()),
-      body: body.slice(0,5000)
-    };
-
-    el.output().innerHTML = `<b>Status:</b> ${res.status}<br><b>URL:</b> ${res.url}`;
-    el.details().innerHTML = `<b>Body length:</b> ${body.length}`;
-    saveHistory(lastReport);
-
+    const r = {};
+    r.http = await scanHTTP(domain);
+    setProgress(20);
+    r.tech = techFingerprint(r.http);
+    r.headers = scanHeaders(r.http.headers);
+    setProgress(35);
+    r.dns = await scanDNS(domain);
+    setProgress(50);
+    r.ports = await scanPorts(domain);
+    setProgress(70);
+    r.waf = detectWAF(r.http.headers, r.http.body);
+    r.xss = xssIndicators(r.http);
+    r.sqli = sqliIndicators(r.http);
+    r.rce = rceIndicators(r.http);
+    r.forms = formIssues(r.http.body);
+    r.owasp = owaspMap(r);
+    r.version = detectCMSVersion(r.http.body);
+    setProgress(90);
+    r.risk = risk(r);
     setProgress(100);
-    log("Scan finished");
-  } catch (e) {
+
+    lastReport = r;
+    saveHistory(r);
+
+    const out = `
+${section("HTTP", `
+Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}
+HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
+`)}
+${section("Tech", r.tech.join(", ")||"None")}
+${section("CMS Version", r.version.join("<br>")||"None")}
+${section("Security Headers", r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
+${section("WAF", `Detected: ${r.waf.vendors.join(", ")||"None"}<br>Protection: ${r.waf.level}`)}
+${section("XSS Indicators", r.xss.join("<br>")||"None")}
+${section("SQLi Indicators", r.sqli.join("<br>")||"None")}
+${section("RCE Indicators", r.rce.join("<br>")||"None")}
+${section("Form Issues", r.forms.join("<br>")||"None")}
+${section("OWASP Mapping", r.owasp.join("<br>")||"None")}
+${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
+`;
+    document.getElementById("scanOut").innerHTML = `<pre>${out}</pre>`;
+    setStatus("Scan completed.");
+  }catch(e){
+    setStatus("Scan failed (CORS/proxy/timeout).");
     setProgress(0);
-    el.output().innerHTML = `<b>Scan failed</b>`;
-    log("Scan failed (proxy/CORS or offline)");
+    document.getElementById("scanOut").innerHTML = "<pre>Scan failed. Try another target.</pre>";
   }
 }
 
-// LAB
-function buildUrl(domain,ep,payload){
-  const sep = ep.includes("?") ? "&" : "?";
-  return PROXY + domain + ep + sep + encodeURIComponent(payload);
+// lab
+function buildUrl(domain, ep, payload, method){
+  const base = PROXY + "http://" + domain;
+  if(method==="GET"){
+    const sep = ep.includes("?") ? "&" : "?";
+    return base + ep + sep + encodeURIComponent(payload);
+  }
+  return base + ep;
 }
 async function labRun(){
-  const domain = clean(document.getElementById("target").value);
+  const domain = clean(document.getElementById("scanTarget").value);
   const ep = document.getElementById("labEndpoint").value.trim();
+  const method = document.getElementById("labMethod").value;
   const payload = document.getElementById("labPayload").value.trim();
-  if(!domain||!ep){ el.labOut().textContent="Target+endpoint required"; return; }
-
+  if(!domain || !ep || !payload){
+    document.getElementById("labOut").innerHTML = "<pre>Target, endpoint & payload required.</pre>";
+    return;
+  }
+  const url = buildUrl(domain, ep, payload, method);
   try{
-    const res = await timeoutFetch(buildUrl(domain,ep,payload),8000);
-    const body = await res.text();
-    el.labOut().textContent = `Status:${res.status}\nURL:${res.url}\nBody:\n${body.slice(0,400)}`;
+    const res = await timeoutFetch(url, 8000);
+    const text = await res.text();
+    document.getElementById("labOut").innerHTML = `<pre>Status: ${res.status}\nURL: ${res.url}\n\n${text.slice(0,500)}</pre>`;
   }catch{
-    el.labOut().textContent = "Lab request failed";
+    document.getElementById("labOut").innerHTML = "<pre>Lab request failed (CORS/proxy/timeout).</pre>";
+  }
+}
+async function labValidate(){
+  const domain = clean(document.getElementById("scanTarget").value);
+  const ep = document.getElementById("labEndpoint").value.trim();
+  const method = document.getElementById("labMethod").value;
+  if(!domain || !ep){
+    document.getElementById("labOut").innerHTML = "<pre>Target + endpoint required.</pre>";
+    return;
+  }
+  const token = "ORCA_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+  const payload = `echo ${token}`;
+  const url = buildUrl(domain, ep, payload, method);
+  try{
+    const res = await timeoutFetch(url, 8000);
+    const text = await res.text();
+    const ok = text.includes(token);
+    document.getElementById("labOut").innerHTML = `<pre>VALIDATION RESULT: ${ok ? "VALID" : "NOT VALID"}\nToken: ${token}\n\n${text.slice(0,500)}</pre>`;
+  }catch{
+    document.getElementById("labOut").innerHTML = "<pre>Validation failed (CORS/proxy/timeout).</pre>";
   }
 }
 
-// Brute (simple)
-async function brute(type){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){ alert("Target required"); return; }
-
-  if(!bruteState[type].running){
-    bruteState[type].running=true;
-    bruteState[type].index=0;
-    bruteState[type].found=[];
-    if(type==="admin") bruteState[type].list=["admin","administrator","login","wp-admin"];
-    if(type==="dir") bruteState[type].list=["admin","backup","uploads","config","api"];
-    if(type==="sub") bruteState[type].list=["www","api","dev","test","blog"];
-  }
-
-  while(bruteState[type].running && bruteState[type].index < bruteState[type].list.length){
-    const p = bruteState[type].list[bruteState[type].index++];
-    try{
-      const res = await timeoutFetch(PROXY + (type==="sub" ? `${p}.${domain}` : `${domain}/${p}`), 4000);
-      if(res.status===200) bruteState[type].found.push(p);
-    }catch{}
-    document.getElementById(type+"Out").textContent =
-      `${type.toUpperCase()} Brute\nFound: ${bruteState[type].found.join(", ") || "None"}\nChecked: ${bruteState[type].index}/${bruteState[type].list.length}`;
-    await new Promise(r=>setTimeout(r,200));
-  }
-}
-
-function pause(type){ bruteState[type].running=false; }
-function resume(type){ brute(type); }
-
-function exportJSON(){
-  if(!lastReport){ alert("No report"); return; }
-  const blob = new Blob([JSON.stringify(lastReport,null,2)],{type:"application/json"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "report.json";
-  a.click();
-}
-
-// Events
-document.addEventListener("DOMContentLoaded", ()=>{
-  renderHistory();
-  document.querySelectorAll(".menu button").forEach(b=>{
-    b.addEventListener("click", ()=>setTab(b.dataset.tab));
+// tabs
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    document.querySelectorAll(".tab-content").forEach(c=>c.style.display="none");
+    document.getElementById("tab-"+t.dataset.tab).style.display="block";
   });
-
-  document.getElementById("scanBtn").addEventListener("click", scan);
-  document.getElementById("themeBtn").addEventListener("click", toggleTheme);
-  document.getElementById("exportBtn").addEventListener("click", exportJSON);
-
-  document.getElementById("labRunBtn").addEventListener("click", labRun);
-
-  document.getElementById("adminBtn").addEventListener("click", ()=>brute("admin"));
-  document.getElementById("pauseAdminBtn").addEventListener("click", ()=>pause("admin"));
-  document.getElementById("resumeAdminBtn").addEventListener("click", ()=>resume("admin"));
-
-  document.getElementById("dirBtn").addEventListener("click", ()=>brute("dir"));
-  document.getElementById("pauseDirBtn").addEventListener("click", ()=>pause("dir"));
-  document.getElementById("resumeDirBtn").addEventListener("click", ()=>resume("dir"));
-
-  document.getElementById("subBtn").addEventListener("click", ()=>brute("sub"));
-  document.getElementById("pauseSubBtn").addEventListener("click", ()=>pause("sub"));
-  document.getElementById("resumeSubBtn").addEventListener("click", ()=>resume("sub"));
-
-  document.getElementById("clearHistoryBtn").addEventListener("click", clearHistory);
 });
+
+// buttons
+document.getElementById("btnTheme").addEventListener("click", ()=>{
+  const root = document.documentElement;
+  const t = root.getAttribute("data-theme");
+  root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
+});
+document.getElementById("btnExport").addEventListener("click", exportReport);
+document.getElementById("btnHistory").addEventListener("click", ()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelector('.tab[data-tab="history"]').classList.add("active");
+  document.querySelectorAll(".tab-content").forEach(c=>c.style.display="none");
+  document.getElementById("tab-history").style.display="block";
+  renderHistory();
+});
+document.getElementById("btnScan").addEventListener("click", ()=>{
+  const domain = clean(document.getElementById("target").value);
+  if(!domain){ setStatus("Target required."); return; }
+  document.getElementById("scanTarget").value = domain;
+  runScan(domain);
+});
+document.getElementById("scanBtn").addEventListener("click", ()=>{
+  const domain = clean(document.getElementById("scanTarget").value);
+  if(!domain){ setStatus("Target required."); return; }
+  runScan(domain);
+});
+document.getElementById("btnScanQuick").addEventListener("click", ()=>{
+  const domain = clean(document.getElementById("scanTarget").value);
+  if(!domain){ setStatus("Target required."); return; }
+  runScan(domain);
+});
+document.getElementById("btnScanDeep").addEventListener("click", ()=>{
+  const domain = clean(document.getElementById("scanTarget").value);
+  if(!domain){ setStatus("Target required."); return; }
+  runScan(domain);
+});
+document.getElementById("labRun").addEventListener("click", labRun);
+document.getElementById("labValidate").addEventListener("click", labValidate);
+
+// initial
+setProgress(0);
+setStatus("Idle");
+renderHistory();
 </script>
 </body>
 </html>
