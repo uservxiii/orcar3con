@@ -190,5 +190,88 @@ async function rceValidate(){
   render();
 }
 </script>
+  <script>
+/* ================= ORCA UPGRADE PATCH ================= */
+
+/* ---- STRONG WORDPRESS DETECTION ---- */
+function isWordPress(html, headers){
+  if(/wp-content|wp-includes|wp-emoji/i.test(html)) return true;
+  if(headers.get("x-powered-by")?.toLowerCase().includes("wordpress")) return true;
+  if(headers.get("link")?.includes("wp-json")) return true;
+  return false;
+}
+
+/* ---- ADMIN ENUM VIA WP JSON (VALID) ---- */
+async function enumUsersWPJSON(base){
+  add("WP JSON User Enumeration (Enhanced)");
+
+  const endpoints=[
+    "/wp-json/wp/v2/users",
+    "/wp-json/wp/v2/users?context=edit",
+    "/wp-json/wp/v2/users/me"
+  ];
+
+  let found=false;
+
+  for(const ep of endpoints){
+    const r=await fetchSafe(base+ep);
+    if(!r || r.status!==200) continue;
+
+    try{
+      const data=await r.json();
+      const users=Array.isArray(data)?data:[data];
+
+      users.forEach(u=>{
+        const name=u.slug||u.name||"unknown";
+        const roles=u.roles||[];
+        if(roles.includes("administrator")){
+          add("ADMIN FOUND : "+name+" ⚠️⚠️⚠️");
+        }else{
+          add("User : "+name);
+        }
+        found=true;
+      });
+    }catch{}
+  }
+
+  if(!found) add("WP JSON protected or no users exposed");
+  add("");
+  render();
+}
+
+/* ---- WRAP ORIGINAL SCAN (NO EDIT) ---- */
+const originalScan = scan;
+scan = async function(){
+  clearLog();
+  const base=target.value.replace(/\/$/,"");
+  if(!base) return;
+
+  add("Scanning: "+base+"\n");
+  render();
+
+  const home=await fetchSafe(base);
+  if(!home){add("Target unreachable");render();return;}
+  const html=await home.text();
+
+  add("Server / CDN");
+  add(home.headers.get("server")||"hidden");
+  add("");
+
+  const wp=isWordPress(html, home.headers);
+  add("WordPress detected: "+(wp?"YES ✅":"NO ❌"));
+  add("");
+
+  if(wp){
+    await enumUsersWPJSON(base);   // 🔥 ADMIN PRIORITY
+  }
+
+  await pluginScan(base);
+  add("\nScan completed.");
+  render();
+};
+
+/* ================= END PATCH ================= */
+</script>
+
 </body>
 </html>
