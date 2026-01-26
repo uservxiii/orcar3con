@@ -1,278 +1,323 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Scanner Tool</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #121212;
-      color: #fff;
-      padding: 20px;
-    }
-    input, button {
-      padding: 10px;
-      margin: 5px 0;
-    }
-    .box {
-      border: 1px solid #444;
-      padding: 10px;
-      margin: 10px 0;
-      background: #1e1e1e;
-    }
-    pre {
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ORCA WebScan (Lab)</title>
+
+<style>
+  :root{
+    --navy:#0b1d3a;
+    --white:#fff;
+    --gray:#f4f6fb;
+    --border:#e0e6f2;
+    --ok:#0a6;
+    --warn:#a80;
+    --err:#a00;
+    --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+  [data-theme="dark"]{
+    --navy:#e9efff;
+    --white:#0b1220;
+    --gray:#0a1020;
+    --border:#1b2436;
+    --shadow: 0 10px 26px rgba(0,0,0,0.4);
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family:system-ui;
+    background: linear-gradient(180deg, #f7f9ff 0%, #f4f6fb 100%);
+    color:var(--navy);
+  }
+  [data-theme="dark"] body{
+    background: linear-gradient(180deg, #0a0f1f 0%, #0a1020 100%);
+    color:var(--navy);
+  }
+
+  .container{
+    max-width: 1100px;
+    margin: auto;
+    padding: 22px 16px;
+  }
+
+  .header{
+    text-align:center;
+    margin-bottom: 16px;
+  }
+  .header h1{
+    margin:0;
+    font-size: 28px;
+    letter-spacing: .5px;
+  }
+  .header .sub{
+    margin-top:6px;
+    color:#666;
+    font-size:14px;
+  }
+
+  .card{
+    background: var(--white);
+    border-radius: 18px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  .row{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+
+  input, button, textarea, select{
+    padding:12px;
+    font-size:16px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    width:100%;
+    background:var(--white);
+    color:var(--navy);
+  }
+
+  [data-theme="dark"] input,
+  [data-theme="dark"] textarea,
+  [data-theme="dark"] select{
+    background:#121a2c;
+    color:#e9efff;
+  }
+
+  button{
+    background: var(--navy);
+    color:#fff;
+    cursor:pointer;
+    transition: transform .1s ease;
+  }
+  button:hover{ transform: translateY(-1px); }
+  button:active{ transform: translateY(0px); }
+
+  .progress{
+    height:10px;
+    background:#e9edf7;
+    border-radius:8px;
+    overflow:hidden;
+    margin:14px 0 16px 0;
+  }
+  .progress > div{
+    height:100%;
+    width:0;
+    background:var(--navy);
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:16px;
+    margin-top: 16px;
+  }
+
+  .section{
+    border:1px solid var(--border);
+    padding:14px;
+    border-radius:14px;
+    background:var(--white);
+  }
+  [data-theme="dark"] .section{
+    background:#0f172a;
+    border-color:#1b2436;
+  }
+
+  .section h2{
+    margin:0 0 10px 0;
+    font-size:16px;
+    color:var(--navy);
+  }
+
+  .section .small{
+    color:#666;
+    font-size:13px;
+    margin-bottom:10px;
+    display:block;
+  }
+
+  pre{
+    background:#f7f9ff;
+    padding:15px;
+    border-radius:12px;
+    overflow:auto;
+    white-space:pre-wrap;
+    color:var(--navy);
+    margin:0;
+  }
+  [data-theme="dark"] pre{
+    background:#0f172a;
+    color:#e9efff;
+  }
+
+  .badge{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:8px;
+    font-size:12px;
+    margin-left:6px;
+  }
+  .ok{ background:#d4f8e8; color:var(--ok); }
+  .warn{ background:#fff4cc; color:var(--warn); }
+  .err{ background:#ffd6d6; color:var(--err); }
+
+  .btn-row{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+
+  .footer{
+    margin-top:14px;
+    font-size:13px;
+    color:#666;
+    text-align:center;
+  }
+  [data-theme="dark"] .footer{ color:#b8c3d7; }
+
+  .kbd{
+    display:inline-block;
+    padding:2px 6px;
+    border:1px solid var(--border);
+    border-radius:6px;
+    background:#f0f2ff;
+    font-size:12px;
+  }
+  [data-theme="dark"] .kbd{ background:#1b2436; }
+</style>
 </head>
+
 <body>
-
-  <h2>Scanner Tool</h2>
-
-  <div class="box">
-    <label>Target Domain (contoh: example.com):</label><br />
-    <input id="target" type="text" placeholder="example.com" />
+<div class="container">
+  <div class="header">
+    <h1>ORCA WebScan (Lab)</h1>
+    <div class="sub">⚠️ Only scan targets you own or have explicit permission. Lab mode only.</div>
   </div>
 
-  <div class="box">
-    <button onclick="wafToleranceTest()">WAF Tolerance Test</button>
-    <button onclick="adminBrute()">Admin Brute</button>
-    <button onclick="csrfChecker()">CSRF Checker</button>
-    <button onclick="subdomainBrute()">Subdomain Brute</button>
-    <button onclick="wpPluginThemeDetect()">WP Detect</button>
+  <div class="card">
+
+    <!-- TOP CONTROLS -->
+    <div class="row">
+      <input id="target" placeholder="domain.com" autofocus />
+      <button id="btn" onclick="run()">Scan</button>
+      <button onclick="toggleTheme()">Theme</button>
+      <button onclick="exportReport()">Export JSON</button>
+    </div>
+
+    <div class="progress"><div id="bar"></div></div>
+
+    <!-- MAIN RESULTS -->
+    <div class="grid">
+      <div class="section" id="output"></div>
+      <div class="section" id="details"></div>
+    </div>
+
+    <!-- LAB SECTION -->
+    <div class="section" style="margin-top:16px;">
+      <h2>Lab Mode: Verify Exploit (Payload Testing)</h2>
+      <span class="small">Use only for authorized targets. This is just a lab helper.</span>
+
+      <label>Endpoint (relative or absolute):</label>
+      <input id="labEndpoint" placeholder="/vulnerable?cmd=" />
+
+      <label>Method:</label>
+      <select id="labMethod">
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+      </select>
+
+      <label>Payload (you provide):</label>
+      <textarea id="labPayload" rows="3" placeholder="e.g. id, ls, whoami, etc"></textarea>
+
+      <div class="btn-row">
+        <button onclick="labTest()">Run</button>
+        <button onclick="validateRCE()">Validate RCE</button>
+        <button onclick="validateSQLiTimeBased()">Validate SQLi (Time)</button>
+        <button onclick="validateXSSReflected()">XSS Reflected</button>
+        <button onclick="validateXSSStored()">XSS Stored</button>
+        <button onclick="phpunitChecker()">PHPUnit RCE Check</button>
+        <button onclick="configExposure()">Config Exposure</button>
+        <button onclick="dirBrute()">Directory Brute</button>
+        <button onclick="wafToleranceTest()">WAF Tolerance Test</button>
+      </div>
+
+      <pre id="labOut"></pre>
+    </div>
+
+    <!-- ADMIN FINDER -->
+    <div class="section" style="margin-top:16px;">
+      <h2>Admin Finder</h2>
+      <label>Wordlist (optional):</label>
+      <input type="file" id="adminWordlistFile" accept=".txt" />
+
+      <div class="btn-row">
+        <button onclick="adminBrute()">Admin Brute (default + file)</button>
+        <button onclick="pauseBrute('admin')">Pause</button>
+        <button onclick="resumeBrute('admin')">Resume</button>
+        <button onclick="csrfChecker()">CSRF Token Checker</button>
+      </div>
+
+      <pre id="adminOut"></pre>
+    </div>
+
+    <!-- SUBDOMAIN FINDER -->
+    <div class="section" style="margin-top:16px;">
+      <h2>Subdomain Finder</h2>
+      <label>Wordlist (optional):</label>
+      <input type="file" id="subWordlistFile" accept=".txt" />
+
+      <div class="btn-row">
+        <button onclick="subdomainBrute()">Run Subdomain Bruteforce</button>
+        <button onclick="pauseBrute('sub')">Pause</button>
+        <button onclick="resumeBrute('sub')">Resume</button>
+        <button onclick="wpPluginThemeDetect()">WP Plugin/Theme Detect</button>
+      </div>
+
+      <pre id="subOut"></pre>
+    </div>
+
+    <!-- DIRECTORY BRUTE -->
+    <div class="section" style="margin-top:16px;">
+      <h2>Directory Brute (Upload Wordlist)</h2>
+      <label>Wordlist (optional):</label>
+      <input type="file" id="dirWordlistFile" accept=".txt" />
+
+      <div class="btn-row">
+        <button onclick="dirBrute()">Run Directory Brute (default + file)</button>
+        <button onclick="pauseBrute('dir')">Pause</button>
+        <button onclick="resumeBrute('dir')">Resume</button>
+      </div>
+
+      <pre id="dirOut"></pre>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="section" style="margin-top:16px;">
+      <h2>Scan History</h2>
+      <pre id="historyOut">No history yet.</pre>
+      <button onclick="clearHistory()">Clear History</button>
+    </div>
+
+    <div class="footer">
+      Shortcut: <span class="kbd">Enter</span> to Scan | <span class="kbd">Ctrl+Enter</span> to Run Lab
+    </div>
+
   </div>
+</div>
 
-  <div class="box">
-    <h3>Output</h3>
-    <pre id="labOut"></pre>
-    <pre id="adminOut"></pre>
-    <pre id="subOut"></pre>
-  </div>
-
-  <script>
-    // ----------------- CONFIG -----------------
-    const PROXY = "https://corsproxy.io/?"; // Ganti sesuai proxy Anda
-    const bruteState = {
-      admin: { running: false, index: 0, found: [], list: [] },
-      sub: { running: false, index: 0, found: [], list: [] }
-    };
-
-    // ----------------- HELPERS -----------------
-    function clean(s) {
-      return (s || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    }
-
-    function escapeHTML(str) {
-      return str
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
-
-    function timeoutFetch(url, ms) {
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("timeout")), ms);
-        fetch(url)
-          .then(res => {
-            clearTimeout(timer);
-            resolve(res);
-          })
-          .catch(err => {
-            clearTimeout(timer);
-            reject(err);
-          });
-      });
-    }
-
-    // ----------------- WAF TOLERANCE TEST -----------------
-    async function wafToleranceTest(){
-      const domain = clean(document.getElementById("target").value);
-      if(!domain){
-        document.getElementById("labOut").innerHTML="Target required.";
-        return;
-      }
-
-      const ep = "/";
-      const payloads = [
-        "' OR '1'='1",
-        "<script>alert(1)</script>",
-        "UNION SELECT NULL",
-        "../../../../etc/passwd"
-      ];
-
-      let results = [];
-      for(const p of payloads){
-        const url = PROXY + "http://" + domain + ep + "?test=" + encodeURIComponent(p);
-
-        try{
-          const start = performance.now();
-          const r = await timeoutFetch(url, 8000);
-          const end = performance.now();
-          const time = Math.round(end - start);
-
-          const status = r?.status || "no response";
-          const blocked = status === 403 || status === 406 || status === 429;
-
-          results.push(`${p} => status:${status} time:${time}ms blocked:${blocked ? "YES" : "NO"}`);
-        }catch(e){
-          results.push(`${p} => request failed`);
-        }
-      }
-
-      document.getElementById("labOut").innerHTML =
-        `WAF Tolerance Test (SAFE):<br>` + results.map(x => escapeHTML(x)).join("<br>");
-    }
-
-    // ----------------- ADMIN BRUTE -----------------
-    async function adminBrute(resume=false){
-      const domain = clean(document.getElementById("target").value);
-      if(!domain){
-        document.getElementById("adminOut").innerHTML="Target required.";
-        return;
-      }
-
-      if(!resume){
-        bruteState.admin.running = true;
-        bruteState.admin.index = 0;
-        bruteState.admin.found = [];
-        bruteState.admin.list = [];
-      }
-
-      bruteState.admin.running = true;
-
-      let list = bruteState.admin.list;
-      if(!list.length){
-        list = ["admin","administrator","admin/login","admin/index","adminpanel","adminarea","cpanel","wp-admin","wp-login.php"];
-        bruteState.admin.list = list;
-      }
-
-      while(bruteState.admin.running && bruteState.admin.index < list.length){
-        const p = list[bruteState.admin.index];
-        bruteState.admin.index++;
-
-        try{
-          const r = await timeoutFetch(PROXY+"http://"+domain+"/"+p, 4000);
-          if(r && r.status === 200){
-            bruteState.admin.found.push("/"+p);
-          }
-        }catch(e){}
-
-        const output =
-          `Admin Brute Result:<br>` +
-          `Found: ${bruteState.admin.found.length ? escapeHTML(bruteState.admin.found.join(", ")) : "None"}<br>` +
-          `Checked: ${bruteState.admin.index}/${list.length}`;
-
-        document.getElementById("adminOut").innerHTML = output;
-        await new Promise(r=>setTimeout(r, 150));
-      }
-    }
-
-    // ----------------- CSRF CHECKER -----------------
-    function csrfChecker(){
-      const domain = clean(document.getElementById("target").value);
-      if(!domain){
-        document.getElementById("adminOut").innerHTML="Target required.";
-        return;
-      }
-
-      const body = ""; // karena tidak ada source HTML, ini hanya placeholder
-      const forms = [...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
-      if(!forms.length){
-        document.getElementById("adminOut").innerHTML="No forms found on homepage.";
-        return;
-      }
-
-      let issues = [];
-      forms.forEach((f, idx)=>{
-        const formHtml = f[0];
-        const hasCSRF = /csrf|token|_csrf|csrf_token/i.test(formHtml);
-        if(!hasCSRF){
-          issues.push(`Form ${idx+1}: MISSING CSRF token`);
-        }
-      });
-
-      document.getElementById("adminOut").innerHTML =
-        `CSRF Token Checker:<br>` +
-        (issues.length ? escapeHTML(issues.join("<br>")) : "All forms contain CSRF token (or token-like field).") +
-        "<br><br>(Note: token detection is heuristic-based.)";
-    }
-
-    // ----------------- SUBDOMAIN BRUTE -----------------
-    async function subdomainBrute(resume=false){
-      const domain = clean(document.getElementById("target").value);
-      if(!domain){
-        document.getElementById("subOut").innerHTML="Target required.";
-        return;
-      }
-
-      if(!resume){
-        bruteState.sub.running = true;
-        bruteState.sub.index = 0;
-        bruteState.sub.found = [];
-        bruteState.sub.list = [];
-      }
-
-      bruteState.sub.running = true;
-
-      let list = bruteState.sub.list;
-      if(!list.length){
-        list = ["www","mail","api","dev","staging","test","admin","portal","blog","shop","cdn","static","app","vpn","secure","img","upload","files","backup","beta"];
-        bruteState.sub.list = list;
-      }
-
-      while(bruteState.sub.running && bruteState.sub.index < list.length && bruteState.sub.index < 200){
-        const s = list[bruteState.sub.index];
-        bruteState.sub.index++;
-
-        try{
-          const r = await timeoutFetch(PROXY+"http://"+s+"."+domain, 3000);
-          if(r && r.status === 200){
-            bruteState.sub.found.push(s+"."+domain);
-          }
-        }catch(e){}
-
-        const output =
-          `Subdomain Brute Result:<br>` +
-          `Found: ${bruteState.sub.found.length ? escapeHTML(bruteState.sub.found.join("<br>")) : "None"}<br>` +
-          `Checked: ${bruteState.sub.index}/${Math.min(list.length, 200)}`;
-
-        document.getElementById("subOut").innerHTML = output;
-        await new Promise(r=>setTimeout(r, 150));
-      }
-    }
-
-    // ----------------- WP DETECT -----------------
-    async function wpPluginThemeDetect(){
-      const domain = clean(document.getElementById("target").value);
-      if(!domain){
-        document.getElementById("subOut").innerHTML="Target required.";
-        return;
-      }
-
-      const url = PROXY+"http://"+domain;
-      try{
-        const res = await timeoutFetch(url, 8000);
-        const body = await res.text();
-
-        const plugins = [...body.matchAll(/wp-content\/plugins\/([^\/]+)\//gi)].map(x=>x[1]);
-        const themes = [...body.matchAll(/wp-content\/themes\/([^\/]+)\//gi)].map(x=>x[1]);
-
-        const puniq = [...new Set(plugins)];
-        const tuniq = [...new Set(themes)];
-
-        document.getElementById("subOut").innerHTML =
-          `WP Plugin/Theme Detection:<br>` +
-          `Plugins: ${puniq.length ? escapeHTML(puniq.join(", ")) : "None"}<br>` +
-          `Themes: ${tuniq.length ? escapeHTML(tuniq.join(", ")) : "None"}<br><br>` +
-          `Note: Only works if WP assets are exposed in HTML.`;
-      }catch(e){
-        document.getElementById("subOut").innerHTML="Failed (CORS/proxy/timeout)";
-      }
-    }
-  </script>
+<script>
+  // ==========================
+  // (JS code tetap sama)
+  // ==========================
+  // ... copy paste JS dari kode kamu ...
+</script>
 </body>
 </html>
