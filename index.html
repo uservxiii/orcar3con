@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress LAB (Final)</title>
+<title>ORCA WebScan – WordPress LAB</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -35,7 +35,7 @@ body{
   flex-direction:column;
   gap:12px;
 }
-.sidebar h2{margin:0 0 10px 0}
+.sidebar h2{margin:0}
 .sidebar button{
   padding:12px;
   border-radius:12px;
@@ -63,9 +63,10 @@ body{
 input{
   width:100%;
   padding:14px;
-  font-size:16px;
+  margin-top:8px;
   border-radius:12px;
   border:none;
+  font-size:15px;
 }
 pre{
   background:#0a1020;
@@ -75,6 +76,7 @@ pre{
   white-space:pre-wrap;
 }
 .light pre{background:#eef2ff;color:#111}
+small{opacity:.7}
 </style>
 </head>
 
@@ -84,10 +86,7 @@ pre{
   <h2>🛡️ ORCA</h2>
   <button onclick="scan()">Scan Target</button>
   <button class="ghost" onclick="bruteForce()">Brute Force (LAB)</button>
-  <button class="ghost" onclick="document.getElementById('wordlist').click()">Upload Wordlist</button>
-  <button class="ghost" onclick="rceLab()">RCE Validation</button>
   <button class="ghost" onclick="toggleTheme()">🌗 Light / Dark</button>
-  <input type="file" id="wordlist" accept=".txt" hidden>
 </div>
 
 <div class="main">
@@ -97,161 +96,154 @@ pre{
     <input id="target" placeholder="example.com (press ENTER)" />
   </div>
 
+  <!-- BRUTE FORCE PANEL -->
+  <div class="card" id="bruteCard" style="display:none">
+    <h3>Brute Force LAB</h3>
+
+    <input id="loginUrl" placeholder="Login URL (ex: https://target/wp-login.php)" />
+
+    <small>Username</small>
+    <input id="singleUser" placeholder="Single username (optional)" />
+    <input type="file" id="userWL" accept=".txt" />
+
+    <small>Password</small>
+    <input id="singlePass" placeholder="Single password (optional)" />
+    <input type="file" id="passWL" accept=".txt" />
+
+    <button style="margin-top:12px" onclick="runBruteLab()">Run LAB Simulation</button>
+  </div>
+
   <div class="card">
     <pre id="out">Idle.</pre>
   </div>
 </div>
 
 <script>
-/* ================= CORE ================= */
-const PROXY="https://r.jina.ai/http://";
 const out=t=>document.getElementById("out").textContent=t;
 const clean=d=>d.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
 
+/* ================= ENTER SCAN ================= */
 target.addEventListener("keydown",e=>{
   if(e.key==="Enter") scan();
 });
-
-async function hybridFetch(url,timeout=6000){
-  const c=new AbortController();
-  setTimeout(()=>c.abort(),timeout);
-  try{
-    return {res:await fetch(url,{signal:c.signal}),mode:"direct"};
-  }catch{
-    try{
-      return {res:await fetch(PROXY+url.replace(/^https?:\/\//,'')),mode:"proxy"};
-    }catch{return null;}
-  }
-}
 
 /* ================= SCAN ================= */
 async function scan(){
   const domain=clean(target.value.trim());
   if(!domain) return;
-  out("Scanning...");
-  let log=`Target\n------\n${domain}\n\n`;
+  out("Scanning target...");
   const base="https://"+domain;
 
-  const home=await hybridFetch(base);
-  if(!home){out("Target unreachable");return;}
-
-  const html=await home.res.text();
-  log+=`Fetch Mode\n----------\n${home.mode}\n\n`;
-
-  log+=`WordPress Detected\n------------------\n${/wp-content|wp-includes/i.test(html)?"YES":"NO"}\n\n`;
-
-  log+="Admin Paths\n-----------\n";
-  for(const p of ["/wp-login.php","/wp-admin/"]){
-    const r=await hybridFetch(base+p);
-    log+=`${p} => ${r?r.res.status:"blocked"}\n`;
-  }
-
-  const xr=await hybridFetch(base+"/xmlrpc.php");
-  log+=`\nXML-RPC\n-------\n${xr?xr.res.status:"blocked"}\n`;
-
-  const rest=await hybridFetch(base+"/wp-json/wp/v2/users");
-  log+=`\nUser Enumeration\n----------------\n`;
-  if(rest && rest.res.status===200){
-    try{
-      const d=await rest.res.json();
-      if(d.length){
-        log+="Exposed (REST API)\n";
-        d.forEach(u=>log+=` - ${u.slug}\n`);
-      }else log+="Restricted\n";
-    }catch{log+="Filtered\n";}
-  }else log+="Protected\n";
-
-  const plugins=[...new Set(
-    [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)].map(m=>m[1])
-  )];
-  log+=`\nPlugins\n-------\n${plugins.join(", ")||"None"}\n`;
-
-  log+="\nScan Mode\n---------\nHybrid Passive LAB Scan\n";
-  out(log);
-}
-
-/* ================= WORDLIST ================= */
-let defaultWL=[
- "admin","password","admin123","wordpress","wpadmin","123456",
- "qwerty","Qwerty","QWERTY",
- "qwerty123","Qwerty123","qwerty12345","Qwerty12345",
- "qwertyuiop","1q2w3e4r","asdfgh","zxcvbn",
- "letmein","welcome","iloveyou"
-];
-let customWL=[];
-
-document.getElementById("wordlist").addEventListener("change",e=>{
-  const f=e.target.files[0];
-  if(!f) return;
-  const r=new FileReader();
-  r.onload=()=>{
-    customWL=r.result.split(/\r?\n/).map(x=>x.trim()).filter(x=>x);
-    out(`Custom wordlist loaded\nEntries: ${customWL.length}`);
-  };
-  r.readAsText(f);
-});
-
-/* ================= BRUTE FORCE (SMART LAB) ================= */
-function scorePassword(p){
-  let s=0;
-  if(p.length<6) s+=3;
-  if(/admin|password|qwerty|wp/i.test(p)) s+=4;
-  if(/\d/.test(p)) s+=1;
-  if(/[!@#$%^&*]/.test(p)) s+=1;
-  return s;
-}
-
-function bruteForce(){
-  const wl=customWL.length?customWL:defaultWL;
-  const users=["admin","administrator","editor"];
-
-  const scored=wl.map(p=>({p,score:scorePassword(p)}))
-                 .sort((a,b)=>b.score-a.score);
-
-  const rate=5;
-  const tries=users.length*scored.length;
-  const est=Math.ceil(tries/rate);
-
   let log=
-`Brute Force (SMART LAB)
------------------------
-Mode        : SIMULATION ONLY
-Users       : ${users.join(", ")}
-Wordlist    : ${scored.length}
-Total tries : ${tries}
-Rate limit  : ${rate}/min
-Est. time   : ~${est} min
+`Target
+------
+${domain}
 
-Top Priority Passwords
----------------------\n`;
-
-  scored.slice(0,8).forEach(x=>{
-    log+=` - ${x.p} (risk score: ${x.score})\n`;
-  });
+WordPress Detection
+------------------
+SIMULATION MODE
+`;
 
   log+=`
-Insight
+Admin Paths
+-----------
+/wp-login.php
+/wp-admin/
+
+XML-RPC
 -------
-• Keyboard-pattern passwords (QWERTY) very common
-• Real brute force likely blocked by security plugin
-• Recommended strategy: low & slow
+xmlrpc.php
+
+User Enumeration
+----------------
+REST API (wp-json)
+
+Plugins
+-------
+Passive HTML parsing
 
 Status
 ------
-LAB SAFE MODE – no request sent
+LAB SAFE MODE
 `;
   out(log);
 }
 
-/* ================= RCE ================= */
-function rceLab(){
-  out(
-`RCE Validation (LAB)
---------------------
+/* ================= BRUTE FORCE ================= */
+let userList=[], passList=[];
+let defaultWL=[
+ "admin","password","admin123","wordpress",
+ "123456","qwerty","qwerty123","welcome"
+];
+
+function bruteForce(){
+  document.getElementById("bruteCard").style.display="block";
+  out("Brute Force LAB ready.\nFill login URL & credentials.");
+}
+
+/* LOAD USER WORDLIST */
+userWL.addEventListener("change",e=>{
+  const f=e.target.files[0];
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>userList=r.result.split(/\r?\n/).filter(x=>x);
+  r.readAsText(f);
+});
+
+/* LOAD PASS WORDLIST */
+passWL.addEventListener("change",e=>{
+  const f=e.target.files[0];
+  if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>passList=r.result.split(/\r?\n/).filter(x=>x);
+  r.readAsText(f);
+});
+
+/* RUN LAB */
+function runBruteLab(){
+  const url=loginUrl.value.trim();
+  if(!url) return out("Login URL required!");
+
+  const users = singleUser.value
+    ? [singleUser.value]
+    : userList.length ? userList : ["admin"];
+
+  const passes = singlePass.value
+    ? [singlePass.value]
+    : passList.length ? passList : defaultWL;
+
+  const rate=5;
+  const tries=users.length*passes.length;
+  const est=Math.ceil(tries/rate);
+
+  let log=
+`Brute Force LAB Simulation
+--------------------------
+Login URL : ${url}
+Users     : ${users.length}
+Passwords : ${passes.length}
+Attempts  : ${tries}
+Rate      : ${rate}/min
+ETA       : ~${est} min
+
+Sample Attempts
+---------------
+`;
+
+  users.slice(0,3).forEach(u=>{
+    passes.slice(0,3).forEach(p=>{
+      log+=`POST ${url} | ${u}:${p}\n`;
+    });
+  });
+
+  log+=`
+Status
+------
+SAFE LAB MODE
+No HTTP request sent
 Simulation only
-No payload execution
-Response fingerprinting placeholder`
-  );
+`;
+  out(log);
 }
 
 /* ================= THEME ================= */
