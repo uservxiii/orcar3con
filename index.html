@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WebScan ORCA</title>
+<title>WebScan ORCA (Valid Template Injection)</title>
 <style>
     :root{
         --navy: #0b1d3a;
@@ -14,6 +14,8 @@
         --muted: #6b7a8a;
         --border: #e0e6f2;
         --shadow: rgba(11, 29, 58, 0.12);
+        --green: #1a8a6a;
+        --red: #d32f2f;
     }
 
     *{ box-sizing: border-box; }
@@ -90,11 +92,30 @@
         padding: 15px;
         border-radius: 12px;
         border: 1px solid var(--border);
-        white-space: pre-wrap;
-        font-family: monospace;
-        font-size: 13px;
+        font-size: 14px;
         color: #0b1d3a;
     }
+
+    .code{
+        margin-top: 10px;
+        background: #0b1d3a;
+        color: #fff;
+        padding: 12px;
+        border-radius: 12px;
+        font-family: monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+    }
+
+    .status {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 12px;
+    }
+    .ok { background: var(--green); color: #fff; }
+    .bad { background: var(--red); color: #fff; }
 
     .loading{
         display:none;
@@ -128,7 +149,7 @@
 <div class="container">
     <div class="header">
         <h1>WebScan ORCA</h1>
-        <p>Masukkan domain saja. Contoh: <b>domain.com</b></p>
+        <p>Validasi Template Injection (safe, non-exploit)</p>
     </div>
 
     <div class="card">
@@ -157,84 +178,63 @@ function normalizeUrl(url){
     return url.replace(/\/+$/, "");
 }
 
-// ===== PROXY JINA =====
-const PROXY = "https://r.jina.ai/http://";
+function randId(){
+    return Math.floor(Math.random() * 1000000);
+}
 
-async function fetchProxy(url){
+async function fetchText(url){
     try{
-        const res = await fetch(PROXY + url);
+        const res = await fetch(url);
         const text = await res.text();
         return {status: res.status, url: res.url, text};
-    } catch(e){
+    }catch(e){
         return {status: null, url: null, text: e.message};
     }
 }
 
-// DNS lookup
-async function nslookup(domain){
-    const url = `https://dns.google/resolve?name=${domain}&type=A`;
-    try{
-        const res = await fetch(PROXY + url);
-        const data = await res.json();
-        return data;
-    }catch(e){
-        return {error: "DNS lookup failed"};
-    }
-}
-
-function fingerprintFromBody(body){
-    const server = (body.match(/Server: ([^\n\r]+)/i) || [])[1] || "";
-    const powered = (body.match(/X-Powered-By: ([^\n\r]+)/i) || [])[1] || "";
-    const generator = (body.match(/<meta name="generator" content="([^"]+)"/i) || [])[1] || "";
-
-    const patterns = [
-        {name: "WordPress", check: /wp-content|wp-includes/i},
-        {name: "Joomla", check: /Joomla!/i},
-        {name: "Drupal", check: /drupal/i},
-        {name: "Laravel", check: /laravel/i},
-        {name: "React", check: /<div id="root">/i},
-        {name: "Angular", check: /ng-app/i},
-        {name: "Vue.js", check: /<div id="app">/i}
+function buildPayloads(id){
+    return [
+        {name: "Handlebars/Jinja", payload: `{{"ORCA-${id}"}}`},
+        {name: "JS Template", payload: `${"ORCA-" + id}`},  // this is just plain text for safety
+        {name: "ERB/Ruby", payload: `<%= "ORCA-${id}" %>`}
     ];
-
-    let detected = [];
-    for(const p of patterns){
-        if(p.check.test(body)) detected.push(p.name);
-    }
-    if(generator) detected.push(generator);
-
-    return {
-        server,
-        powered,
-        generator,
-        detected: detected.length ? detected : ["Unknown"]
-    };
 }
 
 async function scan(target){
     target = normalizeUrl(target);
-    const domain = target.replace(/^https?:\/\//, "");
 
-    const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
-    let template = {};
+    const id = randId();
+    const payloads = buildPayloads(id);
 
-    const base = await fetchProxy(target);
+    let results = [];
+    let successCount = 0;
 
-    for(const p of probes){
-        const res = await fetchProxy(target + "?test=" + encodeURIComponent(p));
-        template[p] = res.text.includes("49");
+    // base check
+    const base = await fetchText(target);
+
+    // probe each payload
+    for(const p of payloads){
+        const res = await fetchText(target + "?test=" + encodeURIComponent(p.payload));
+        const ok = res.text.includes(`ORCA-${id}`);
+        if(ok) successCount++;
+
+        results.push({
+            engine: p.name,
+            payload: p.payload,
+            found: ok,
+            status: res.status
+        });
     }
 
-    const fp = fingerprintFromBody(base.text);
-    const dns = await nslookup(domain);
+    const confirmed = successCount >= 2;
 
     return {
         target,
         status: base.status,
-        final_url: base.url,
-        template_probe: template,
-        fingerprint: fp,
-        dns
+        confirmed,
+        successCount,
+        id,
+        results
     };
 }
 
@@ -248,12 +248,22 @@ form.addEventListener("submit", async (e)=>{
     if(!target) return;
 
     loading.style.display = "block";
-    result.innerText = "";
+    result.innerHTML = "";
 
     const data = await scan(target);
 
     loading.style.display = "none";
-    result.innerText = JSON.stringify(data, null, 2);
+
+    let html = "";
+    html += `<div>Status: <span class="status ${data.confirmed ? 'ok' : 'bad'}">${data.confirmed ? 'CONFIRMED' : 'NOT CONFIRMED'}</span></div>`;
+    html += `<div style="margin-top:8px;">Target: <b>${data.target}</b></div>`;
+    html += `<div style="margin-top:8px;">Success: <b>${data.successCount}</b> / 3</div>`;
+
+    html += `<div class="code">`;
+    html += JSON.stringify(data, null, 2);
+    html += `</div>`;
+
+    result.innerHTML = html;
 });
 </script>
 </body>
