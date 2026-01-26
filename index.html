@@ -1,646 +1,89 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
-
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ORCA WebScan</title>
 
 <style>
-  :root{
-    --navy:#0b1d3a;
-    --white:#fff;
-    --gray:#f4f6fb;
-    --border:#e0e6f2;
-    --ok:#0a6;
-    --warn:#a80;
-    --err:#a00;
-    --shadow: 0 8px 24px rgba(0,0,0,0.08);
-  }
-
-  [data-theme="dark"]{
-    --navy:#e9efff;
-    --white:#0b1220;
-    --gray:#0a1020;
-    --border:#1b2436;
-    --shadow: 0 10px 26px rgba(0,0,0,0.4);
-  }
-
-  body{
-    margin:0;
-    font-family: system-ui;
-    background: linear-gradient(180deg, #f7f9ff 0%, #f4f6fb 100%);
-  }
-  [data-theme="dark"] body{
-    background: linear-gradient(180deg, #0a0f1f 0%, #0a1020 100%);
-  }
-
-  .container{
-    max-width: 1100px;
-    margin:auto;
-    padding:20px;
-  }
-
-  .card{
-    background: var(--white);
-    border-radius: 18px;
-    padding: 20px;
-    border:1px solid var(--border);
-    box-shadow: var(--shadow);
-  }
-
-  h1{
-    text-align:center;
-    color: var(--navy);
-    margin:0 0 14px 0;
-  }
-
-  .row{
-    display:flex;
-    gap:12px;
-    align-items:center;
-  }
-
-  input,button,textarea,select{
-    padding:12px;
-    font-size:16px;
-    border-radius:12px;
-    border:1px solid var(--border);
-    width:100%;
-    box-sizing:border-box;
-    background:var(--white);
-    color:var(--navy);
-  }
-
-  [data-theme="dark"] input,
-  [data-theme="dark"] textarea,
-  [data-theme="dark"] select{
-    background:#121a2c;
-    color:#e9efff;
-  }
-
-  button{
-    background: var(--navy);
-    color:#fff;
-    cursor:pointer;
-    transition: transform .1s ease;
-  }
-  button:hover{ transform: translateY(-1px); }
-  button:active{ transform: translateY(0px); }
-
-  pre{
-    background:#f7f9ff;
-    padding:15px;
-    border-radius:12px;
-    overflow:auto;
-    white-space:pre-wrap;
-    color:var(--navy);
-  }
-  [data-theme="dark"] pre{
-    background:#0f172a;
-    color:#e9efff;
-  }
-
-  .badge{
-    display:inline-block;
-    padding:4px 8px;
-    border-radius:8px;
-    font-size:12px;
-    margin-left:6px;
-  }
-  .ok{ background:#d4f8e8; color:var(--ok); }
-  .warn{ background:#fff4cc; color:var(--warn); }
-  .err{ background:#ffd6d6; color:var(--err); }
-
-  .grid{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:16px;
-  }
-
-  .section{
-    border:1px solid var(--border);
-    padding:14px;
-    border-radius:14px;
-    background:var(--white);
-  }
-  [data-theme="dark"] .section{
-    background:#0f172a;
-    border-color:#1b2436;
-  }
-  .section h2{
-    margin:0 0 10px 0;
-    font-size:16px;
-    color:var(--navy);
-  }
-
-  .small{ color:#666; font-size:13px; }
-  [data-theme="dark"] .small{ color:#b8c3d7; }
-
-  .progress{
-    height:10px;
-    background:#e9edf7;
-    border-radius:8px;
-    overflow:hidden;
-    margin:10px 0 14px 0;
-  }
-  .progress > div{
-    height:100%;
-    width:0;
-    background:var(--navy);
-  }
-
-  .footer{
-    margin-top:14px;
-    font-size:13px;
-    color:#666;
-    text-align:center;
-  }
-  [data-theme="dark"] .footer{ color:#b8c3d7; }
-
-  .kbd{
-    display:inline-block;
-    padding:2px 6px;
-    border:1px solid var(--border);
-    border-radius:6px;
-    background:#f0f2ff;
-    font-size:12px;
-  }
-  [data-theme="dark"] .kbd{ background:#1b2436; }
-
-  .btn-row{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-
-  /* Responsiveness */
-  @media (max-width: 900px){
-    .grid{ grid-template-columns: 1fr; }
-  }
+:root{
+  --navy:#0b1d3a;--bg:#f4f6fb;--card:#fff;--border:#e0e6f2;
+}
+body{margin:0;font-family:system-ui;background:var(--bg)}
+.container{max-width:1100px;margin:auto;padding:20px}
+.card{background:var(--card);border-radius:18px;padding:20px;border:1px solid var(--border)}
+.row{display:flex;gap:10px}
+input,textarea,select,button{
+  padding:12px;border-radius:12px;border:1px solid var(--border);width:100%;
+}
+button{background:var(--navy);color:#fff;cursor:pointer}
+.section{margin-top:15px;padding:15px;border:1px solid var(--border);border-radius:14px}
+.progress{height:10px;background:#ddd;border-radius:6px;overflow:hidden}
+.progress div{height:100%;width:0;background:var(--navy)}
+pre{background:#eee;padding:12px;border-radius:10px;white-space:pre-wrap}
+.hidden{display:none}
 </style>
-
 </head>
 
 <body>
 <div class="container">
-  <h1>ORCA WebScan</h1>
+<h1>ORCA WebScan</h1>
 
-  <div class="card">
-    <p class="small">⚠️ Only scan targets you own or have explicit permission to test.</p>
-    <p class="small">⚠️ Only scan targets you own or have explicit permission to test. This is LAB mode.</p>
+<div class="card">
+
+  <div class="row">
+    <input id="target" placeholder="example.com">
+    <button onclick="run()">Scan</button>
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+
+  <div class="progress"><div id="bar"></div></div>
+
+  <div class="section">
+    <h2>Results</h2>
+    <div id="output">No scan yet.</div>
+  </div>
+
+  <div class="section">
+    <h2>Details</h2>
+    <pre id="details">-</pre>
+  </div>
+
+  <div class="section">
+    <button onclick="toggleLab()">Toggle LAB Mode</button>
+  </div>
+
+  <!-- LAB MODE -->
+  <div id="lab" class="section hidden">
+    <h2>LAB Mode</h2>
+
+    <input id="labEndpoint" placeholder="/search?q=">
+    <select id="labMethod">
+      <option>GET</option>
+      <option>POST</option>
+    </select>
+    <textarea id="labPayload" placeholder="payload"></textarea>
 
     <div class="row">
-      <input id="target" placeholder="domain.com" autofocus>
-      <button onclick="run()">Scan</button>
-      <button onclick="toggleTheme()">Toggle Theme</button>
+      <button onclick="labTest()">Send</button>
     </div>
 
-    <div class="progress"><div id="bar"></div></div>
-
-    <div class="grid">
-      <div class="section">
-        <h2>Results</h2>
-        <div id="output">No scan yet.</div>
-      </div>
-
-      <div class="section">
-        <h2>Details</h2>
-        <div id="details">No scan yet.</div>
-      </div>
-    </div>
-
-    <div class="btn-row" style="margin-top: 12px;">
-      <button onclick="exportReport()">Export JSON</button>
-      <button onclick="clearHistory()">Clear History</button>
-    </div>
-
-    <div class="section" style="margin-top: 12px;">
-      <h2>Scan History</h2>
-      <pre id="historyOut">No history yet.</pre>
-    </div>
-
-    <div class="footer">
-      ORCA WebScan • Lab Mode • © 2026
-    </div>
+    <pre id="labOut">Lab output…</pre>
   </div>
+
+  <div class="section">
+    <button onclick="exportReport()">Export JSON</button>
+    <button onclick="clearHistory()">Clear History</button>
+  </div>
+
+  <div class="section">
+    <h2>History</h2>
+    <pre id="historyOut">No history</pre>
+  </div>
+
+</div>
 </div>
 
-<script>
-const PROXY="https://r.jina.ai/http://";
-const ports=[80,443,8080,8443];
-const headersCheck=[
-  "content-security-policy",
-  "strict-transport-security",
-  "x-frame-options",
-  "x-content-type-options",
-  "referrer-policy",
-  "permissions-policy"
-];
-
-let lastReport = null;
-let bruteState = {
-  admin: {running:false, index:0, list:[], found:[], delay:200},
-  sub: {running:false, index:0, list:[], found:[], delay:200},
-  dir: {running:false, index:0, list:[], found:[], delay:200}
-};
-
-/* ----------------- HELPERS ----------------- */
-function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
-function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
-function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
-function section(title,html){ return `<h2>${title}</h2>${html}`; }
-
-async function timeoutFetch(url,ms=8000){
-  const c=new AbortController();
-  setTimeout(()=>c.abort(),ms);
-  return fetch(url,{signal:c.signal});
-}
-
-function buildUrl(domain, ep, payload, method){
-  const base = PROXY + "http://" + domain;
-  if(method === "GET"){
-    const separator = ep.includes("?") ? "&" : "?";
-    return base + ep + separator + encodeURIComponent(payload);
-  }
-  return base + ep;
-}
-
-/* ----------------- THEME ----------------- */
-function toggleTheme(){
-  const root = document.documentElement;
-  const t = root.getAttribute("data-theme");
-  root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
-}
-
-/* ----------------- STORAGE ----------------- */
-function saveHistory(report){
-  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  h.unshift({time:new Date().toISOString(), report});
-  localStorage.setItem("orca_history", JSON.stringify(h.slice(0, 20)));
-  renderHistory();
-}
-
-function renderHistory(){
-  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  if(!h.length){
-    document.getElementById("historyOut").textContent="No history yet.";
-    return;
-  }
-  document.getElementById("historyOut").textContent = h.map(x=>`${x.time}\n${JSON.stringify(x.report, null, 2)}`).join("\n\n");
-}
-
-function clearHistory(){
-  localStorage.removeItem("orca_history");
-  renderHistory();
-}
-
-/* ----------------- SCAN FUNCTIONS ----------------- */
-async function scanHTTP(domain){
-  const r=await timeoutFetch(PROXY+"http://"+domain);
-  const text=await r.text();
-  let headersObj = {};
-  r.headers.forEach((v,k)=> headersObj[k]=v);
-  return {
-    status:r.status,
-    url:r.url,
-    headers:headersObj,
-    body:text,
-    https:r.url.startsWith("https")
-  };
-}
-
-function techFingerprint(http){
-  const tech=[];
-  const body=http.body||"";
-  const server=http.headers["server"]||"";
-  const patterns = [
-    ["WordPress", /wp-content|wp-includes/i],
-    ["Joomla", /Joomla!/i],
-    ["Drupal", /drupal/i],
-    ["Magento", /Magento/i],
-    ["Shopify", /shopify/i],
-    ["Laravel", /laravel/i],
-    ["Express", /express/i],
-    ["Django", /django/i],
-    ["Ruby on Rails", /rails/i],
-    ["Next.js", /next\.js/i],
-    ["React", /react/i],
-    ["Angular", /angular/i]
-  ];
-  patterns.forEach(p=>{
-    if(p[1].test(body) || server.toLowerCase().includes(p[0].toLowerCase())){
-      tech.push(p[0]);
-    }
-  });
-  return [...new Set(tech)];
-}
-
-function scanHeaders(h){
-  return headersCheck.map(x=>({name:x,ok:!!h[x]}));
-}
-
-async function scanDNS(domain){
-  const types=["A","AAAA","MX","NS","TXT"];
-  let out={};
-  for(const t of types){
-    try{
-      const r=await fetch(`https://dns.google/resolve?name=${domain}&type=${t}`);
-      const j=await r.json();
-      out[t]=j.Answer?.map(x=>x.data)||[];
-    }catch{ out[t]=[]; }
-  }
-  return out;
-}
-
-async function subdomains(domain){
-  let list=[];
-  try{
-    const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
-    const j=await r.json();
-    list = [...new Set(j.map(x=>x.name_value))].slice(0,30);
-  }catch{}
-  try{
-    const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
-    const j=await r.json();
-    if(j.Answer) list.push(domain);
-  }catch{}
-  const common = ["www","mail","api","dev","staging","test","admin","portal","blog","shop"];
-  common.forEach(s=>list.push(`${s}.${domain}`));
-  return [...new Set(list)].slice(0,40);
-}
-
-async function scanPorts(domain){
-  let res={};
-  for(const p of ports){
-    try{
-      await timeoutFetch(`http://${domain}:${p}`,3000);
-      res[p]=true;
-    }catch{res[p]=false;}
-  }
-  return res;
-}
-
-function detectWAF(headers, body){
-  const waf=[];
-  const h=k=> (headers[k]||"").toLowerCase();
-  const b=(body||"").toLowerCase();
-  if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
-  if(h("x-sucuri-id")||b.includes("sucuri firewall")) waf.push("Sucu ri");
-  if(h("x-akamai-transformed")||h("akamai-ghost")) waf.push("Akamai");
-  if(h("x-incapsula")||b.includes("incapsula")) waf.push("Imperva");
-  if(h("x-waf")||h("x-firewall")) waf.push("Generic WAF");
-
-  let level="None";
-  if(waf.length){
-    level = waf.some(x=>["Cloudflare","Akamai","Imperva"].includes(x)) ? "High" : "Medium";
-  }
-  return {vendors:[...new Set(waf)], level};
-}
-
-function xssIndicators(http){
-  const issues=[];
-  const h=http.headers;
-  const body=http.body||"";
-  if(!h["content-security-policy"]) issues.push("Missing CSP");
-  if(/<script[\s>]/i.test(body)) issues.push("Inline <script> present");
-  if(/innerHTML\s*=|document\.write|eval\(/i.test(body)) issues.push("DOM XSS sink pattern");
-  if(!h["x-xss-protection"]) issues.push("X-XSS-Protection missing (legacy)");
-  return issues;
-}
-
-function sqliIndicators(http){
-  const issues=[];
-  const body=http.body||"";
-  const err=[
-    /sql syntax/i,
-    /mysql_fetch|mysqli_/i,
-    /ORA-\d+/i,
-    /ODBC SQL Server/i,
-    /Unclosed quotation mark/i,
-    /SQLite\/JDBC/i,
-    /syntax error at or near/i
-  ];
-  if(err.some(r=>r.test(body))) issues.push("SQL error pattern in response");
-  const url = http.url || "";
-  const hasParams = url.includes("?");
-  if(hasParams){
-    const params = url.split("?")[1];
-    if(/('|%27|--|;|or%20|and%20)/i.test(params))
-      issues.push("Suspicious SQL chars in URL parameters");
-  }
-  return issues;
-}
-
-function rceIndicators(http){
-  const issues=[];
-  const body=http.body||"";
-  const patterns=[
-    /command not found/i,
-    /popen\(/i,
-    /exec\(/i,
-    /system\(/i,
-    /shell_exec\(/i,
-    /Permission denied/i,
-    /cannot execute/i
-  ];
-  if(patterns.some(r=>r.test(body))) issues.push("Command execution error pattern in response");
-  if(http.url.includes("cmd=") || http.url.includes("exec=") || http.url.includes("command="))
-    issues.push("Command-like parameter name detected");
-  return issues;
-}
-
-function formIssues(body){
-  const issues=[];
-  const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
-  forms.forEach(f=>{
-    if(!/csrf|token/i.test(f[0]))
-      issues.push("Form without CSRF token");
-  });
-  return issues;
-}
-
-async function detectAdmin(domain){
-  const adminPaths = [
-    "/wp-admin/", "/administrator/", "/user/login", "/admin", "/login",
-    "/admin/login", "/admin.php", "/adminarea", "/adminpanel", "/useradmin",
-    "/cpanel", "/manager/html", "/admin/login.php", "/admin/index.php",
-    "/user", "/admin/dashboard", "/admin/home", "/backend", "/adminpanel.php",
-    "/wp-login.php", "/wp-admin.php"
-  ];
-  const found=[];
-  for(const p of adminPaths){
-    try{
-      const r = await timeoutFetch(PROXY + "http://" + domain + p, 4000);
-      const t = await r.text();
-      if(r.status === 200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password"))){
-        found.push(p);
-      }
-    }catch{}
-  }
-  return [...new Set(found)];
-}
-
-async function detectCMSAdmin(domain){
-  const checks = [
-    {name:"WordPress", path:"/wp-login.php"},
-    {name:"Joomla", path:"/administrator/"},
-    {name:"Drupal", path:"/user/login"}
-  ];
-  let found = [];
-  for(const c of checks){
-    try{
-      const r = await timeoutFetch(PROXY + "http://" + domain + c.path, 5000);
-      const t = await r.text();
-      const ok = r.status===200 && (t.toLowerCase().includes("login") || t.toLowerCase().includes("password") || t.toLowerCase().includes("wp-"));
-      if(ok) found.push(`${c.name} => ${c.path}`);
-    }catch{}
-  }
-  return found;
-}
-
-function detectCMSVersion(body){
-  const v=[];
-  const wp = body.match(/wp-content\/themes\/[^\/]+\/style\.css.*?Version:\s*([0-9.]+)/i);
-  if(wp) v.push(`WordPress: ${wp[1]}`);
-  const joomla = body.match(/content="Joomla! - Open Source Content Management".*?version\s*([0-9.]+)/i);
-  if(joomla) v.push(`Joomla: ${joomla[1]}`);
-  const drupal = body.match(/name="Generator" content="Drupal ([0-9.]+)"/i);
-  if(drupal) v.push(`Drupal: ${drupal[1]}`);
-  return v;
-}
-
-function owaspMap(r){
-  const map=[];
-  if(r.sqli?.length) map.push("A03: Injection (indicator)");
-  if(r.xss?.length) map.push("A03: Injection (XSS indicator)");
-  if(r.rce?.length) map.push("A01: Broken Access Control (RCE indicator)");
-  if(r.headers?.some(h=>!h.ok)) map.push("A05: Security Misconfiguration");
-  if(r.forms?.length) map.push("A08: CSRF (signal)");
-  return [...new Set(map)];
-}
-
-function risk(r){
-  let s=0;
-  if(!r.http.https) s+=20;
-  if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
-  if(r.tech.includes("WordPress")) s+=5;
-  if(r.waf.level==="High") s+=10;
-  if(r.xss.length) s+=10;
-  if(r.sqli.length) s+=10;
-  if(r.rce.length) s+=10;
-  return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
-}
-
-async function run(){
-  const out=document.getElementById("output");
-  const det=document.getElementById("details");
-  const domain=clean(document.getElementById("target").value);
-  if(!domain) return;
-
-  setProgress(5);
-  out.innerHTML = "<b>Scanning...</b>";
-
-  let r={};
-
-  try{
-    r.http=await scanHTTP(domain);
-    setProgress(20);
-
-    r.tech=techFingerprint(r.http);
-    r.headers=scanHeaders(r.http.headers);
-    setProgress(30);
-
-    r.dns=await scanDNS(domain);
-    setProgress(40);
-
-    r.subdomains=await subdomains(domain);
-    setProgress(55);
-
-    r.ports=await scanPorts(domain);
-    setProgress(70);
-
-    r.waf = detectWAF(r.http.headers, r.http.body);
-    r.xss = xssIndicators(r.http);
-    r.sqli = sqliIndicators(r.http);
-    r.rce = rceIndicators(r.http);
-    r.forms = formIssues(r.http.body);
-    r.owasp = owaspMap(r);
-    r.version = detectCMSVersion(r.http.body);
-    setProgress(80);
-
-    r.admin = await detectAdmin(domain);
-    r.cmsAdmin = await detectCMSAdmin(domain);
-    setProgress(90);
-
-    r.risk=risk(r);
-    setProgress(100);
-
-    lastReport = r;
-    saveHistory(r);
-
-  }catch(e){
-    out.innerHTML = "<b>Scan failed.</b><br><span class='small'>Possible CORS / Proxy limit.</span>";
-    setProgress(0);
-    return;
-  }
-
-  out.innerHTML = `
-    ${section("HTTP", `
-      Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}<br>
-      HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
-    `)}
-    ${section("Tech", r.tech.join(", ")||"None")}
-    ${section("CMS Version", r.version.join("<br>")||"None")}
-    ${section("Security Headers", r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
-    ${section("WAF", `
-      Detected: ${r.waf.vendors.join(", ")||"None"}<br>
-      Protection: ${r.waf.level}
-    `)}
-    ${section("XSS Indicators", r.xss.join("<br>")||"None")}
-    ${section("SQLi Indicators", r.sqli.join("<br>")||"None")}
-    ${section("RCE Indicators", r.rce.join("<br>")||"None")}
-    ${section("Form Issues", r.forms.join("<br>")||"None")}
-    ${section("OWASP Mapping", r.owasp.join("<br>")||"None")}
-    ${section("Admin Login Paths", r.admin.join("<br>")||"None")}
-    ${section("CMS Admin Fingerprint", r.cmsAdmin.join("<br>")||"None")}
-  `;
-
-  det.innerHTML = `
-    ${section("DNS", Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))}
-    ${section("Subdomains", r.subdomains.join("<br>")||"None")}
-    ${section("Ports", Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"))}
-    ${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
-  `;
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const target = document.getElementById("target");
-  target.focus();
-  target.addEventListener("keydown", function(e){
-    if(e.key === "Enter"){
-      e.preventDefault();
-      run();
-    }
-  });
-  renderHistory();
-});
-
-/* ----------------- EXPORT ----------------- */
-function exportReport(){
-  if(!lastReport){
-    alert("No report to export yet.");
-    return;
-  }
-  const blob = new Blob([JSON.stringify(lastReport, null, 2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "orca_report.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-</script>
-
+<script src="script.js"></script>
 </body>
 </html>
