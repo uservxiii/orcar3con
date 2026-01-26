@@ -2,117 +2,44 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress LAB</title>
+<title>ORCA WebScan – WordPress LAB (FINAL)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <style>
-:root{
-  --bg:#0b1220;
-  --panel:#121a2c;
-  --text:#e9efff;
-  --accent:#4f7cff;
-}
-.light{
-  --bg:#f4f6fb;
-  --panel:#ffffff;
-  --text:#0b1220;
-  --accent:#3b6cff;
-}
+:root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
+.light{--bg:#f4f6fb;--panel:#ffffff;--text:#0b1220;--accent:#3b6cff}
 *{box-sizing:border-box}
-body{
-  margin:0;
-  font-family:system-ui;
-  background:var(--bg);
-  color:var(--text);
-  display:flex;
-  height:100vh;
-}
-.sidebar{
-  width:230px;
-  background:var(--panel);
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:12px;
-}
-.sidebar h2{margin:0}
-.sidebar button{
-  padding:12px;
-  border-radius:12px;
-  border:none;
-  background:var(--accent);
-  color:#fff;
-  cursor:pointer;
-}
-.sidebar .ghost{
-  background:transparent;
-  color:var(--text);
-  border:1px solid var(--accent);
-}
-.main{
-  flex:1;
-  padding:24px;
-  overflow:auto;
-}
-.card{
-  background:var(--panel);
-  border-radius:18px;
-  padding:18px;
-  margin-bottom:16px;
-}
-input{
-  width:100%;
-  padding:14px;
-  margin-top:8px;
-  border-radius:12px;
-  border:none;
-  font-size:15px;
-}
-pre{
-  background:#0a1020;
-  color:#cde;
-  padding:16px;
-  border-radius:14px;
-  white-space:pre-wrap;
-  height:320px;
-  overflow:auto;
-}
+body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;height:100vh}
+.sidebar{width:240px;background:var(--panel);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sidebar h2{margin:0 0 10px 0}
+.sidebar button{padding:12px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+.sidebar .ghost{background:transparent;color:var(--text);border:1px solid var(--accent)}
+.main{flex:1;padding:24px;overflow:auto}
+.card{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:16px}
+input{width:100%;padding:14px;font-size:16px;border-radius:12px;border:none}
+pre{background:#0a1020;color:#cde;padding:16px;border-radius:14px;white-space:pre-wrap}
 .light pre{background:#eef2ff;color:#111}
 small{opacity:.7}
 </style>
 </head>
 
 <body>
-
 <div class="sidebar">
   <h2>🛡️ ORCA</h2>
   <button onclick="scan()">Scan Target</button>
-  <button class="ghost" onclick="bruteForce()">Brute Force (LAB)</button>
+  <button class="ghost" onclick="openBrute()">Brute Force (LAB)</button>
+  <button class="ghost" onclick="document.getElementById('uword').click()">Upload Username WL</button>
+  <button class="ghost" onclick="document.getElementById('pword').click()">Upload Password WL</button>
   <button class="ghost" onclick="toggleTheme()">🌗 Light / Dark</button>
+  <input type="file" id="uword" accept=".txt" hidden>
+  <input type="file" id="pword" accept=".txt" hidden>
 </div>
 
 <div class="main">
   <h1>ORCA WebScan – WordPress LAB</h1>
 
   <div class="card">
-    <input id="target" placeholder="example.com (press ENTER)" />
-  </div>
-
-  <!-- BRUTE FORCE PANEL -->
-  <div class="card" id="bruteCard" style="display:none">
-    <h3>Brute Force LAB (Timed)</h3>
-
-    <input id="loginUrl" placeholder="Login URL (https://target/wp-login.php)" />
-
-    <small>Username</small>
-    <input id="singleUser" placeholder="Single username (optional)" />
-    <input type="file" id="userWL" accept=".txt" />
-
-    <small>Password</small>
-    <input id="singlePass" placeholder="Single password (optional)" />
-    <input type="file" id="passWL" accept=".txt" />
-
-    <button style="margin-top:12px" onclick="runBruteLab()">Start LAB</button>
+    <input id="target" placeholder="https://example.com (ENTER)" />
+    <small>LAB SAFE MODE – no exploit, no real brute force</small>
   </div>
 
   <div class="card">
@@ -121,147 +48,200 @@ small{opacity:.7}
 </div>
 
 <script>
-/* ================= CORE ================= */
+/* ============== CORE ============== */
 const PROXY="https://r.jina.ai/http://";
-const outEl=document.getElementById("out");
-const out=t=>outEl.textContent=t;
-const append=t=>{
-  outEl.textContent+=t;
-  outEl.scrollTop=outEl.scrollHeight;
-};
+const out=t=>document.getElementById("out").textContent=t;
+const add=t=>document.getElementById("out").textContent+=t+"\n";
 const clean=d=>d.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
 
-target.addEventListener("keydown",e=>{
-  if(e.key==="Enter") scan();
-});
-
-async function hybridFetch(url,timeout=7000){
-  const c=new AbortController();
-  setTimeout(()=>c.abort(),timeout);
-  try{
-    return {res:await fetch(url,{signal:c.signal}),mode:"direct"};
-  }catch{
-    try{
-      return {res:await fetch(PROXY+url.replace(/^https?:\/\//,'')),mode:"proxy"};
-    }catch{return null;}
+async function hybridFetch(url,timeout=8000){
+  const c=new AbortController(); setTimeout(()=>c.abort(),timeout);
+  try{ return {res:await fetch(url,{signal:c.signal}),mode:"direct"}; }
+  catch{
+    try{ return {res:await fetch(PROXY+url.replace(/^https?:\/\//,'')),mode:"proxy"}; }
+    catch{ return null; }
   }
 }
 
-/* ================= SCAN ================= */
+/* ============== SERVER DETECT ============== */
+function detectServer(h){
+  const s=(h.get("server")||"").toLowerCase();
+  if(h.get("cf-ray")||s.includes("cloudflare")) return "Cloudflare (CDN / WAF)";
+  if(s.includes("openresty")) return "OpenResty (Nginx based)";
+  if(s.includes("nginx")) return "Nginx";
+  if(s.includes("apache")) return "Apache";
+  if(s.includes("litespeed")) return "LiteSpeed";
+  if(s.includes("iis")) return "Microsoft IIS";
+  return s||"Unknown / Hidden";
+}
+
+/* ============== CLOUDFLARE TRACE ============== */
+async function readCFTrace(base){
+  try{
+    const r=await hybridFetch(base+"/cdn-cgi/trace");
+    if(!r||r.res.status!==200) return null;
+    const txt=await r.res.text();
+    const o={};
+    txt.split("\n").forEach(l=>{
+      const [k,v]=l.split("="); if(k&&v) o[k]=v;
+    });
+    return o; // colo, asn, ip, loc, tls, http
+  }catch{ return null; }
+}
+
+/* ============== ORIGIN GUESS (HEURISTIC) ============== */
+function guessOrigin(h,html){
+  const hints=[];
+  const xpb=(h.get("x-powered-by")||"").toLowerCase();
+  const via=(h.get("via")||"").toLowerCase();
+  const cfc=(h.get("cf-cache-status")||"").toLowerCase();
+  const alt=(h.get("alt-svc")||"").toLowerCase();
+
+  if(xpb.includes("php")) hints.push("PHP backend");
+  if(xpb.includes("litespeed")) hints.push("LiteSpeed origin");
+  if(via && !via.includes("cloudflare")) hints.push("Via: "+via);
+  if(html.includes("wp-content")||html.includes("wp-includes")) hints.push("WordPress backend");
+  if(cfc) hints.push("CF cache: "+cfc);
+  if(alt.includes("h3")) hints.push("HTTP/3 (often Nginx/OpenResty)");
+
+  let guess="Unknown";
+  const all=hints.join(" ").toLowerCase();
+  if(all.includes("litespeed")) guess="LiteSpeed";
+  else if(all.includes("openresty")) guess="OpenResty";
+  else if(all.includes("nginx")) guess="Nginx";
+  else if(all.includes("apache")) guess="Apache";
+  else if(all.includes("php")) guess="PHP-based (Apache/Nginx)";
+  return {guess,hints};
+}
+
+/* ============== WORDLIST ============== */
+let uWL=[], pWL=[];
+uword.onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{uWL=r.result.split(/\r?\n/).filter(Boolean); out(`Username WL loaded\nEntries: ${uWL.length}`);}
+  r.readAsText(f);
+};
+pword.onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{pWL=r.result.split(/\r?\n/).filter(Boolean); out(`Password WL loaded\nEntries: ${pWL.length}`);}
+  r.readAsText(f);
+};
+
+/* ============== SCAN ============== */
 async function scan(){
-  const domain=clean(target.value.trim());
-  if(!domain) return;
+  const domain=clean(target.value.trim()); if(!domain) return;
   out("Scanning...");
-  let log=`Target\n------\n${domain}\n\n`;
   const base="https://"+domain;
+  let log=`Target\n------\n${domain}\n\n`;
 
   const home=await hybridFetch(base);
-  if(!home){out("Target unreachable");return;}
-  const html=await home.res.text();
-
+  if(!home){ out("Target unreachable"); return; }
   log+=`Fetch Mode\n----------\n${home.mode}\n\n`;
 
-  log+=`WordPress Detected\n------------------\n${/wp-content|wp-includes/i.test(html)?"YES":"NO"}\n\n`;
+  const serverType=detectServer(home.res.headers);
+  log+=`Server Detection\n----------------\n${serverType}\n\n`;
 
-  log+=`Admin Paths\n-----------\n`;
-  for(const p of ["/wp-login.php","/wp-admin/"]){
-    const r=await hybridFetch(base+p);
-    log+=`${p} => ${r?r.res.status:"blocked"}\n`;
+  const html=await home.res.text();
+  const isWP=/wp-content|wp-includes/i.test(html);
+  log+=`WordPress\n----------\n${isWP?"YES":"NO"}\n\n`;
+
+  // Cloudflare trace
+  if(serverType.includes("Cloudflare")){
+    const trace=await readCFTrace(base);
+    log+=`Cloudflare Trace (/cdn-cgi/trace)\n-------------------------------\n`;
+    if(trace){
+      log+=`colo : ${trace.colo||"-"}\n`;
+      log+=`asn  : ${trace.asn||"-"}\n`;
+      log+=`ip   : ${trace.ip||"-"}\n`;
+      log+=`loc  : ${trace.loc||"-"}\n`;
+      log+=`tls  : ${trace.tls||"-"}\n`;
+      log+=`http : ${trace.http||"-"}\n\n`;
+    }else log+=`Blocked / Not exposed\n\n`;
+
+    const og=guessOrigin(home.res.headers,html);
+    log+=`Origin Guess (Heuristic)\n------------------------\nLikely: ${og.guess}\n`;
+    if(og.hints.length){ og.hints.forEach(h=>log+=` - ${h}\n`); }
+    else log+=` - No leak (well hardened)\n`;
+    log+="\n";
   }
 
-  const xr=await hybridFetch(base+"/xmlrpc.php");
-  log+=`\nXML-RPC\n-------\n${xr?xr.res.status:"blocked"}\n`;
-
-  log+=`\nUser Enumeration (REST)\n----------------------\n`;
+  // REST users (case preserved)
+  log+=`Users (REST)\n------------\n`;
   const rest=await hybridFetch(base+"/wp-json/wp/v2/users");
   if(rest && rest.res.status===200){
     try{
       const d=await rest.res.json();
-      if(d.length){
-        log+="EXPOSED\n";
-        d.forEach(u=>log+=` - ${u.slug} (id:${u.id})\n`);
-      }else log+="No users returned\n";
-    }catch{log+="JSON filtered\n";}
-  }else log+=`Protected (${rest?rest.res.status:"blocked"})\n`;
+      if(d.length) d.forEach(u=>log+=` - ${u.slug}\n`);
+      else log+=`Restricted\n`;
+    }catch{ log+=`Filtered\n`; }
+  }else log+=`Protected\n`;
+  log+="\n";
 
-  const plugins=[...new Set(
-    [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)].map(m=>m[1])
-  )];
-  log+=`\nPlugins (Passive)\n-----------------\n${plugins.join(", ")||"None"}\n`;
+  // ?author enum (case preserved from redirect)
+  if(isWP){
+    log+=`Author Enum (?author=1-5)\n--------------------------\n`;
+    for(let i=1;i<=5;i++){
+      try{
+        const r=await fetch(`${base}/?author=${i}`,{redirect:"manual"});
+        const loc=r.headers.get("location")||"";
+        if((r.status===301||r.status===302)&&/\/author\//i.test(loc)){
+          const slug=loc.split("/author/")[1].split("/")[0];
+          log+=` ✔ ID ${i} → ${slug}\n`;
+        }
+      }catch{}
+    }
+    log+="\n";
+  }
 
-  log+="\nScan Mode\n---------\nHybrid Passive Scan\n";
+  log+=`Scan Mode\n---------\nPassive LAB Scan\n`;
   out(log);
 }
 
-/* ================= BRUTE FORCE LAB ================= */
-let userList=[], passList=[];
-let running=false;
-let defaultWL=["admin","password","admin123","qwerty","123456","welcome"];
+/* ============== BRUTE FORCE (FAST SIMULATION) ============== */
+function openBrute(){
+  const login="/wp-login.php";
+  const users=uWL.length?uWL:["Admin"];
+  const pwds=pWL.length?pWL:["Qwerty123!","qwerty123!","QWERTY123!"];
+  const total=users.length*pwds.length;
 
-function bruteForce(){
-  document.getElementById("bruteCard").style.display="block";
-  out("Brute Force LAB ready.");
-}
+  // FAST simulated engine
+  const rate=5000; // attempts/sec (SIMULATED)
+  const estMs=Math.max(50, Math.ceil(total/rate*1000));
 
-userWL.addEventListener("change",e=>{
-  const r=new FileReader();
-  r.onload=()=>userList=r.result.split(/\r?\n/).filter(x=>x);
-  r.readAsText(e.target.files[0]);
-});
-
-passWL.addEventListener("change",e=>{
-  const r=new FileReader();
-  r.onload=()=>passList=r.result.split(/\r?\n/).filter(x=>x);
-  r.readAsText(e.target.files[0]);
-});
-
-async function runBruteLab(){
-  if(running) return;
-  running=true;
-
-  const url=loginUrl.value.trim();
-  if(!url){ out("Login URL required"); running=false; return; }
-
-  const users = singleUser.value ? [singleUser.value] : userList.length ? userList : ["admin"];
-  const passes = singlePass.value ? [singlePass.value] : passList.length ? passList : defaultWL;
-
-  const rate=5;
-  const delay=60000/rate;
-  const total=users.length*passes.length;
-  let count=0;
-  const start=Date.now();
-
-  out(
-`Brute Force LAB Simulation
+  let log=`Brute Force LAB Simulation
 --------------------------
-Login URL : ${url}
+Login URL : ${login}
 Users     : ${users.length}
-Passwords : ${passes.length}
+Passwords : ${pwds.length}
 Total     : ${total}
-Rate      : ${rate}/min
+Engine    : FAST SIMULATED (${rate}/sec)
+ETA       : ~${estMs} ms
 
-Starting...
-`);
+Sample Attempts
+---------------
+`;
 
-  for(const u of users){
-    for(const p of passes){
-      count++;
-      const elapsed=(Date.now()-start)/1000;
-      const eta=Math.round((total-count)*(elapsed/count));
-      append(`[${count}/${total}] ${u}:${p}\nETA ~ ${Math.floor(eta/60)}m ${eta%60}s\n\n`);
-      await new Promise(r=>setTimeout(r,delay));
-    }
-  }
+  users.slice(0,1).forEach(u=>{
+    pwds.slice(0,3).forEach(p=>{
+      log+=`POST ${login} | ${u} : ${p}\n`;
+    });
+  });
 
-  append(`Status\n------\nSAFE LAB MODE\nNo HTTP request sent\n`);
-  running=false;
+  log+=`
+Status
+------
+SAFE MODE
+No request sent
+`;
+
+  out(log);
 }
 
-/* ================= THEME ================= */
-function toggleTheme(){
-  document.body.classList.toggle("light");
-}
+/* ============== THEME ============== */
+function toggleTheme(){ document.body.classList.toggle("light"); }
 </script>
-
 </body>
 </html>
