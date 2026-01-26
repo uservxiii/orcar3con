@@ -157,9 +157,10 @@ function normalizeUrl(url){
     return url.replace(/\/+$/, "");
 }
 
-// -------------------------
-// Fetch with timeout
-// -------------------------
+// ===== CORS PROXY =====
+const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+
+// fetch with timeout
 async function fetchWithTimeout(url, timeoutMs=8000){
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -175,19 +176,19 @@ async function fetchWithTimeout(url, timeoutMs=8000){
     }
 }
 
-// -------------------------
-// DNS Lookup (CORS proxy)
-// -------------------------
-async function nslookup(domain){
-    const proxy = "https://api.allorigins.win/raw?url=";
-    const url = proxy + encodeURIComponent(`https://dns.google/resolve?name=${domain}&type=A`);
+async function fetchProxy(url){
+    return await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url), 8000);
+}
 
+// DNS lookup
+async function nslookup(domain){
+    const url = `https://dns.google/resolve?name=${domain}&type=A`;
     try{
-        const res = await fetch(url, {timeout: 8000});
+        const res = await fetch(CORS_PROXY + encodeURIComponent(url), {signal: new AbortController().signal});
         const data = await res.json();
         return data;
     }catch(e){
-        return {error: "DNS lookup failed (timeout or blocked)"};
+        return {error: "DNS lookup failed"};
     }
 }
 
@@ -228,17 +229,15 @@ async function scan(target){
     let template = {};
 
     // basic
-    const base = await fetchWithTimeout(target, 8000);
+    const base = await fetchProxy(target);
 
     // template probes
     for(const p of probes){
-        const res = await fetchWithTimeout(target + "?test=" + encodeURIComponent(p), 8000);
+        const res = await fetchProxy(target + "?test=" + encodeURIComponent(p));
         template[p] = res.text.includes("49");
     }
 
     const fp = fingerprintFromHeaders(base.headers, base.text);
-
-    // dns
     const dns = await nslookup(domain);
 
     return {
