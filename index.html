@@ -1,241 +1,466 @@
-<!DOCTYPE html>
 <html lang="en">
+
+
 <head>
+
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress LAB (STABLE)</title>
+
+
+<title>ORCA WebScan – WordPress LAB (FINAL FIX)</title>
+
+
+<title>ORCA WebScan – WordPress LAB (FINAL)</title>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-:root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
-.light{--bg:#f4f6fb;--panel:#ffffff;--text:#0b1220;--accent:#3b6cff}
-*{box-sizing:border-box}
-body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;height:100vh}
-.sidebar{width:260px;background:var(--panel);padding:20px;display:flex;flex-direction:column;gap:10px}
-.sidebar h2{margin:0}
-.sidebar button{padding:12px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer}
-.sidebar .ghost{background:transparent;color:var(--text);border:1px solid var(--accent)}
-.main{flex:1;padding:24px;overflow:auto}
-.card{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:16px}
-input{width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:8px}
-pre{background:#0a1020;color:#cde;padding:16px;border-radius:14px;white-space:pre-wrap}
-.light pre{background:#eef2ff;color:#111}
-small{opacity:.7}
-</style>
-</head>
 
-<body>
+:root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
+
+@@ -26,16 +26,16 @@
+
 <div class="sidebar">
+
   <h2>🛡️ ORCA</h2>
+
   <button onclick="scan()">Scan Target</button>
+
+
+  <button class="ghost" onclick="showBrute()">Brute Force LAB</button>
+
+
   <button class="ghost" onclick="toggleBrute()">Brute Force LAB</button>
-  <button class="ghost" onclick="rceValidate()">RCE Validation</button>
+
   <button class="ghost" onclick="toggleTheme()">🌗 Theme</button>
+
 </div>
+
+
 
 <div class="main">
+
   <h1>ORCA WebScan – WordPress LAB</h1>
 
+
+
   <div class="card">
+
+
+    <input id="target" placeholder="https://example.com">
+
+
+    <small>Passive scan only – no exploit</small>
+
+
     <input id="target" placeholder="https://example.com (ENTER)">
-    <small>Passive scan · SAFE MODE · LAB ONLY</small>
+
+
+    <small>Passive scan only · LAB SAFE MODE</small>
+
   </div>
+
+
 
   <div class="card" id="brute" style="display:none">
-    <h3>Brute Force LAB (Simulation)</h3>
-    <input id="loginUrl" placeholder="/wp-login.php">
-    <input id="singleUser" placeholder="Username (optional)">
-    <input type="file" id="userWL">
-    <input id="singlePass" placeholder="Password (optional)">
-    <input type="file" id="passWL">
-    <button onclick="runBrute()">Run Simulation</button>
-  </div>
 
-  <div class="card">
-    <pre id="out">Idle.</pre>
-  </div>
+@@ -54,90 +54,129 @@ <h3>Brute Force LAB (Simulation)</h3>
+
 </div>
 
-<script>
-/* ========= LOG BUFFER (ANTI OVERWRITE) ========= */
-const log=[];
-const add=t=>log.push(t);
-const render=()=>outEl.textContent=log.join("\n");
-const outEl=document.getElementById("out");
 
-/* ========= BASIC ========= */
+
+<script>
+
+
+/* ================= CORE ================= */
+
+const out=t=>document.getElementById("out").textContent=t;
+
+const add=t=>document.getElementById("out").textContent+=t+"\n";
+
+
 const target=document.getElementById("target");
+
+
 target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
-const toggleTheme=()=>document.body.classList.toggle("light");
-const toggleBrute=()=>{
+
+
+
+function toggleTheme(){document.body.classList.toggle("light");}
+
+
+function showBrute(){document.getElementById("brute").style.display="block";}
+
+
+
+
+
+async function fetchSafe(url){
+
+
+  try{return await fetch(url,{redirect:"manual"});}catch{return null;}
+
+
+function toggleBrute(){
+
+
   const b=document.getElementById("brute");
+
+
   b.style.display=b.style.display==="none"?"block":"none";
-};
-async function fetchSafe(u){
-  try{return await fetch(u,{redirect:"manual"});}catch{return null;}
+
+
 }
 
-/* ========= PLUGIN DB ========= */
-const plugins=[
- {name:"revslider",path:"/wp-content/plugins/revslider/",cves:["CVE-2014-9734"],risk:"HIGH"},
- {name:"wp-file-manager",path:"/wp-content/plugins/wp-file-manager/",cves:["CVE-2020-25213"],risk:"HIGH"},
- {name:"elementor",path:"/wp-content/plugins/elementor/",cves:["CVE-2023-48777"],risk:"MEDIUM"}
-];
 
-const cveInfo={
- "CVE-2014-9734":"RevSlider arbitrary file upload → RCE",
- "CVE-2020-25213":"WP File Manager unauthenticated RCE",
- "CVE-2023-48777":"Elementor template import RCE"
-};
+async function fetchSafe(u){
 
-/* ========= MAIN SCAN ========= */
+
+  try{return await fetch(u,{redirect:"manual"});}catch{return null;}
+
+}
+
+
+
+/* ================= SCAN ================= */
+
 async function scan(){
-  log.length=0;
-  const base=target.value.replace(/\/$/,"");
-  if(!base) return;
 
-  add("ORCA WebScan – LAB MODE");
-  add("========================");
-  add("Target: "+base+"\n");
-  render();
+
+  const base=document.getElementById("target").value.replace(/\/$/,"");
+
+
+  const base=target.value.replace(/\/$/,"");
+
+  if(!base)return;
+
+  out("Scanning...\n");
+
+
+
+
+  const r=await fetchSafe(base);
+
+
+  if(!r){out("Target unreachable");return;}
+
+
+
+
+
+  const html=await r.text();
+
 
   const home=await fetchSafe(base);
-  if(!home){add("Target unreachable");render();return;}
+
+
+  if(!home){out("Target unreachable");return;}
+
 
   const html=await home.text();
 
-  add("Server");
+
+
+  add("Target");
+
   add("------");
-  add(home.headers.get("server")||"Hidden");
-  if(home.headers.get("cf-ray")) add("Cloudflare detected");
+
+  add(base+"\n");
+
+
+
+
+  /* SERVER / CDN */
+
+  add("Server / CDN");
+
+  add("------------");
+
+
+  const srv=(r.headers.get("server")||"hidden");
+
+
+  add(srv);
+
+
+  if(r.headers.get("cf-ray")) add("Cloudflare detected");
+
+
+  const server=home.headers.get("server")||"hidden";
+
+
+  add(server);
+
+
+  const isCF=!!home.headers.get("cf-ray");
+
+
+  if(isCF)add("Cloudflare detected");
+
   add("");
+
+
+
+
+  if(r.headers.get("cf-ray")){
+
+
+    const t=await fetchSafe(base+"/cdn-cgi/trace");
+
+
+  /* CLOUDFLARE TRACE */
+
+
+  if(isCF){
+
+    add("Cloudflare Trace");
+
+    add("----------------");
+
+
+    const t=await fetchSafe(base+"/cdn-cgi/trace");
+
+    if(t){
+
+      (await t.text()).split("\n").forEach(l=>add(l));
+
+    }else add("Blocked");
+
+    add("");
+
+  }
+
+
+
+
+  /* WORDPRESS */
+
+
+  const isWP=/wp-content|wp-includes/i.test(html);
 
   add("WordPress");
+
   add("----------");
-  add(/wp-content|wp-includes/i.test(html)?"YES":"NO");
+
+
+  const isWP=/wp-content|wp-includes/i.test(html);
+
+  add(isWP?"YES":"NO");
+
   add("");
 
-  await enumUsers(base);
-  await detectPlugins(base);
-  add("\nScan completed.");
-  render();
-}
 
-/* ========= USER ENUM ========= */
-async function enumUsers(base){
-  add("User Enumeration");
-  add("----------------");
-  let found=new Set();
 
-  // REST API
-  const r=await fetchSafe(base+"/wp-json/wp/v2/users");
-  if(r && r.status===200){
-    try{
-      const js=await r.json();
-      js.forEach(u=>found.add(u.slug));
-    }catch{}
+
+  /* ADMIN PATH */
+
+  add("Admin Paths");
+
+  add("-----------");
+
+  for(const p of ["/wp-login.php","/wp-admin/"]){
+
+
+    const x=await fetchSafe(base+p);
+
+
+    add(`${p} → ${x?x.status:"blocked"}`);
+
+
+    const r=await fetchSafe(base+p);
+
+
+    add(`${p} → ${r?r.status:"blocked"}`);
+
   }
 
-  // Author ID
-  for(let i=1;i<=5;i++){
-    const a=await fetchSafe(`${base}/?author=${i}`);
-    if(a && a.url){
-      const m=a.url.match(/\/author\/([^\/]+)/);
-      if(m) found.add(m[1]);
-    }
-  }
-
-  if(found.size){
-    [...found].forEach(u=>add("• "+u));
-  }else{
-    add("No users enumerated");
-  }
   add("");
-}
 
-/* ========= PLUGIN FINGERPRINT ========= */
-async function detectPlugins(base){
-  add("Plugin RCE Fingerprint");
-  add("----------------------");
-  let hit=false;
 
-  for(const p of plugins){
-    const r=await fetchSafe(base+p.path);
-    if(!r) continue;
-    if(r.status===200){
-      hit=true;
-      add(`Plugin : ${p.name}`);
-      add(`Path   : ${p.path}`);
-      add(`Risk   : ${p.risk}`);
-      add(`CVE    : ${p.cves.join(", ")}`);
-      p.cves.forEach(c=>add(" ↳ "+c+" : "+cveInfo[c]));
-      add("");
-    }
-  }
-  if(!hit) add("No known vulnerable plugin detected\n");
-}
 
-/* ========= RCE VALIDATION (SAFE) ========= */
-async function rceValidate(){
-  log.length=0;
-  const base=target.value.replace(/\/$/,"");
-  if(!base)return;
 
-  add("RCE Validation – LAB");
-  add("-------------------");
-  let score=0;
+  /* XMLRPC */
 
-  const tests=["/?cmd=id","/?exec=whoami","/wp-admin/admin-ajax.php?action=test"];
-  for(const t of tests){
-    const r=await fetchSafe(base+t);
-    if(!r){add(`${t} → blocked`);continue;}
-    const tx=await r.text();
-    if(/uid=|gid=|root:/i.test(tx)){add(`${t} → EXEC STRING [HIGH]`);score+=3;}
-    else if(/warning|fatal/i.test(tx)){add(`${t} → ERROR LEAK [MEDIUM]`);score+=2;}
-    else if(r.status===200){add(`${t} → UNEXPECTED RESPONSE [LOW]`);score+=1;}
-    else add(`${t} → OK`);
-  }
+  add("XML-RPC");
 
-  add("\nResult");
-  add("------");
-  add(score>=5?"LIKELY VULNERABLE":"NO STRONG INDICATION");
-  add("\nSAFE MODE – no payload executed");
-  render();
-}
+  add("-------");
 
-/* ========= BRUTE LAB ========= */
-let uWL=[],pWL=[];
-userWL.onchange=e=>{
-  const r=new FileReader();
-  r.onload=()=>uWL=r.result.split(/\r?\n/).filter(Boolean);
-  r.readAsText(e.target.files[0]);
-};
-passWL.onchange=e=>{
-  const r=new FileReader();
-  r.onload=()=>pWL=r.result.split(/\r?\n/).filter(Boolean);
-  r.readAsText(e.target.files[0]);
-};
+  const xr=await fetchSafe(base+"/xmlrpc.php");
 
-function runBrute(){
-  log.length=0;
-  const url=loginUrl.value||"/wp-login.php";
-  const users=singleUser.value?[singleUser.value]:uWL;
-  const pass=singlePass.value?[singlePass.value]:pWL;
+  add(xr?xr.status:"blocked");
 
-  add("Brute Force LAB Simulation");
-  add("--------------------------");
-  add("Login URL : "+url);
-  add("Users     : "+users.length);
-  add("Passwords : "+pass.length+"\n");
+  add("");
 
-  users.slice(0,1).forEach(u=>{
-    pass.slice(0,3).forEach(p=>{
-      add(`POST ${url} | ${u}:${p}`);
+
+
+
+  /* REST USERS */
+
+
+  let restUsers=[];
+
+  add("Users (REST)");
+
+  add("------------");
+
+
+  const u=await fetchSafe(base+"/wp-json/wp/v2/users");
+
+
+  if(u && u.status===200){
+
+
+    const d=await u.json();
+
+
+    d.forEach(x=>{
+
+
+      add(` - ${x.slug} (Display: ${x.name})`);
+
+
+  const ru=await fetchSafe(base+"/wp-json/wp/v2/users");
+
+
+  if(ru&&ru.status===200){
+
+
+    const d=await ru.json();
+
+
+    d.forEach(u=>{
+
+
+      restUsers.push({
+
+
+        slug:u.slug,
+
+
+        display:u.name
+
+
+      });
+
+
+      add(` - ${u.slug} (Display: ${u.name})`);
+
     });
+
+  }else add("Protected");
+
+  add("");
+
+
+
+
+  /* AUTHOR ENUM */
+
+
+  let authorUsers=[];
+
+  add("Author Enum");
+
+  add("-----------");
+
+
+  for(let i=1;i<=5;i++){
+
+
+    const a=await fetchSafe(base+`/?author=${i}`);
+
+
+  for(let i=1;i<=10;i++){
+
+
+    const a=await fetchSafe(`${base}/?author=${i}`);
+
+    const loc=a?.headers.get("location")||"";
+
+    if(loc.includes("/author/")){
+
+
+      add(`ID ${i} → ${loc.split("/author/")[1].split("/")[0]}`);
+
+
+      const slug=loc.split("/author/")[1].split("/")[0];
+
+
+      authorUsers.push(slug);
+
+
+      add(`ID ${i} → ${slug}`);
+
+    }
+
+  }
+
+
+  add("");
+
+
+
+
+
+  /* AUTO MERGE */
+
+
+  add("Merged Users (REST + Author)");
+
+
+  add("-----------------------------");
+
+
+  restUsers.forEach(u=>{
+
+
+    const au=authorUsers.find(a=>a.toLowerCase()===u.slug.toLowerCase());
+
+
+    add(`• ${u.slug}`);
+
+
+    add(`  Display  : ${u.display}`);
+
+
+    if(au){
+
+
+      add(`  Author   : ${au}`);
+
+
+      add(`  Source   : REST + Author`);
+
+
+      add(`  Confidence: HIGH`);
+
+
+    }else{
+
+
+      add(`  Source   : REST only`);
+
+
+      add(`  Confidence: MEDIUM`);
+
+
+    }
+
+
+    add("");
+
+
   });
 
-  add("\nSAFE MODE – no request sent");
-  render();
+
+
+
+  add("\nScan completed.");
+
+
+  add("Scan completed.");
+
 }
-</script>
-</body>
-</html>
+
+
+
