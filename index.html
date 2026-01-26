@@ -157,34 +157,24 @@ function normalizeUrl(url){
     return url.replace(/\/+$/, "");
 }
 
-// ===== CORS PROXY =====
-const CORS_PROXY = "https://api.allorigins.win/raw?url=";
-
-// fetch with timeout
-async function fetchWithTimeout(url, timeoutMs=8000){
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try{
-        const res = await fetch(url, { signal: controller.signal });
-        const text = await res.text();
-        clearTimeout(timer);
-        return {status: res.status, url: res.url, headers: res.headers, text};
-    } catch (e) {
-        clearTimeout(timer);
-        return {status: null, url: null, headers: null, text: e.message};
-    }
-}
+// ===== PROXY JINA =====
+const PROXY = "https://r.jina.ai/http://";
 
 async function fetchProxy(url){
-    return await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url), 8000);
+    try{
+        const res = await fetch(PROXY + url);
+        const text = await res.text();
+        return {status: res.status, url: res.url, text};
+    } catch(e){
+        return {status: null, url: null, text: e.message};
+    }
 }
 
 // DNS lookup
 async function nslookup(domain){
     const url = `https://dns.google/resolve?name=${domain}&type=A`;
     try{
-        const res = await fetch(CORS_PROXY + encodeURIComponent(url), {signal: new AbortController().signal});
+        const res = await fetch(PROXY + url);
         const data = await res.json();
         return data;
     }catch(e){
@@ -192,9 +182,9 @@ async function nslookup(domain){
     }
 }
 
-function fingerprintFromHeaders(headers, body){
-    const server = headers ? headers.get("server") || "" : "";
-    const powered = headers ? headers.get("x-powered-by") || "" : "";
+function fingerprintFromBody(body){
+    const server = (body.match(/Server: ([^\n\r]+)/i) || [])[1] || "";
+    const powered = (body.match(/X-Powered-By: ([^\n\r]+)/i) || [])[1] || "";
     const generator = (body.match(/<meta name="generator" content="([^"]+)"/i) || [])[1] || "";
 
     const patterns = [
@@ -228,16 +218,14 @@ async function scan(target){
     const probes = ["{{7*7}}", "${7*7}", "<%=7*7%>"];
     let template = {};
 
-    // basic
     const base = await fetchProxy(target);
 
-    // template probes
     for(const p of probes){
         const res = await fetchProxy(target + "?test=" + encodeURIComponent(p));
         template[p] = res.text.includes("49");
     }
 
-    const fp = fingerprintFromHeaders(base.headers, base.text);
+    const fp = fingerprintFromBody(base.text);
     const dns = await nslookup(domain);
 
     return {
