@@ -3,469 +3,190 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan (Stable)</title>
+<title>ORCA WebScan – Passive Recon</title>
+
 <style>
 :root{
-  --navy:#0b1d3a;
-  --navy2:#0f2a4a;
-  --white:#f7f8fb;
-  --gray:#e6e9f2;
-  --text:#0b1220;
-  --border:#2a3a55;
-  --ok:#0a6;
-  --warn:#a80;
-  --err:#a00;
-  --shadow: 0 8px 24px rgba(0,0,0,0.12);
-}
-[data-theme="dark"]{
-  --navy:#e9efff;
-  --navy2:#a9c2ff;
-  --white:#0b1220;
-  --gray:#0a1020;
+  --bg:#070a14;
+  --panel:#0b1220;
   --text:#e9efff;
+  --muted:#9aa3b7;
   --border:#1b2436;
-  --shadow: 0 10px 26px rgba(0,0,0,0.4);
+  --accent:#5b8cff;
+  --high:#ef4444;
+  --med:#f59e0b;
+  --low:#22c55e;
 }
 body{
   margin:0;
-  font-family: system-ui, sans-serif;
-  background: linear-gradient(180deg, #f2f4ff 0%, #e8ecff 100%);
+  font-family:system-ui,Segoe UI,sans-serif;
+  background:linear-gradient(180deg,#070a14,#0a1020);
+  color:var(--text);
 }
-[data-theme="dark"] body{
-  background: linear-gradient(180deg, #070a14 0%, #0a1020 100%);
-}
-.container{
-  max-width: 1200px;
-  margin:auto;
+.container{max-width:1200px;margin:auto;padding:24px}
+.card{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:18px;
   padding:20px;
 }
-.sidebar{
-  width: 260px;
-  border-right:1px solid var(--border);
-  background: rgba(255,255,255,0.06);
-  padding: 16px;
-  box-shadow: var(--shadow);
-  border-radius: 18px;
-}
-.main{
-  flex:1;
-  padding: 16px;
-}
-.layout{
-  display:flex;
-  gap:16px;
-}
-.brand{
-  font-weight:800;
-  color: var(--navy);
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
-}
-[data-theme="dark"] .brand{ color: var(--navy); }
-.navbtn{
-  width:100%;
-  padding:12px 10px;
-  margin:6px 0;
-  border-radius:12px;
-  border:1px solid var(--border);
-  background: rgba(255,255,255,0.04);
-  color: var(--text);
-  cursor:pointer;
-  text-align:left;
-  font-weight:600;
-}
-.navbtn.active{
-  background: linear-gradient(90deg, var(--navy2), var(--navy));
-  color:#fff;
-}
-.card{
-  background: var(--white);
-  border-radius: 18px;
-  padding: 18px;
-  border:1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-h1{ margin:0 0 8px 0; color:var(--navy); }
-[data-theme="dark"] h1{ color: var(--navy); }
-.small{ color: #7a7f9a; font-size: 13px; }
-input,button,textarea,select{
+h1{margin:0;color:var(--accent)}
+.small{font-size:13px;color:var(--muted)}
+.row{display:flex;gap:10px;margin-top:12px}
+input,button{
   padding:12px;
-  font-size:16px;
+  font-size:15px;
   border-radius:12px;
   border:1px solid var(--border);
-  width:100%;
-  box-sizing:border-box;
-  background: var(--white);
-  color: var(--text);
-}
-[data-theme="dark"] input, textarea, select{
-  background:#121a2c;
-  color:#e9efff;
-}
-button{
-  background: var(--navy);
-  color:#fff;
-  cursor:pointer;
-}
-button:hover{ opacity:0.95; }
-.row{ display:flex; gap:12px; }
-.row > *{ flex:1; }
-.pre{
-  background:#f7f9ff;
-  padding:14px;
-  border-radius:12px;
-  overflow:auto;
-  white-space:pre-wrap;
-  color: var(--text);
-}
-[data-theme="dark"] .pre{
   background:#0f172a;
-  color:#e9efff;
+  color:var(--text);
 }
-.badge{
-  display:inline-block;
-  padding:4px 8px;
-  border-radius:8px;
-  font-size:12px;
-  margin-left:6px;
-}
-.ok{ background:#d4f8e8; color:var(--ok); }
-.warn{ background:#fff4cc; color:var(--warn); }
-.err{ background:#ffd6d6; color:var(--err); }
-.progress{
-  height:10px;
-  background:#e9edf7;
-  border-radius:8px;
-  overflow:hidden;
-  margin:10px 0 14px 0;
-}
-.progress > div{
-  height:100%;
-  width:0;
-  background:var(--navy);
+input{flex:1}
+button{background:var(--accent);cursor:pointer}
+button:hover{opacity:.95}
+.pre{
+  margin-top:16px;
+  background:#020617;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  white-space:pre-wrap;
+  font-family:ui-monospace,Consolas,monospace;
+  font-size:14px;
 }
 .footer{
   margin-top:14px;
-  font-size:13px;
-  color:#666;
   text-align:center;
-}
-[data-theme="dark"] .footer{ color:#b8c3d7; }
-.kbd{
-  display:inline-block;
-  padding:2px 6px;
-  border:1px solid var(--border);
-  border-radius:6px;
-  background:#f0f2ff;
   font-size:12px;
+  color:var(--muted);
 }
-[data-theme="dark"] .kbd{ background:#1b2436; }
+.badge{padding:2px 8px;border-radius:8px;font-size:12px}
+.high{background:#3f0d0d;color:var(--high)}
+.med{background:#3a2a05;color:var(--med)}
+.low{background:#052e1a;color:var(--low)}
 </style>
 </head>
+
 <body>
 <div class="container">
-  <div class="layout">
-    <div class="sidebar">
-      <div class="brand">ORCA WebScan</div>
-      <button class="navbtn active" data-tab="scan">Scan</button>
-      <button class="navbtn" data-tab="lab">Lab</button>
-      <button class="navbtn" data-tab="history">History</button>
-      <hr>
-      <button class="navbtn" id="themeBtn">Toggle Theme</button>
-      <div class="small" style="margin-top:10px;">
-        ⚠️ Only scan targets you own or have permission.
-      </div>
+  <div class="card">
+    <h1>🐋 ORCA WebScan</h1>
+    <div class="small">
+      Passive Recon Engine · WordPress CVE Matcher · GitHub Pages Safe
     </div>
 
-    <div class="main">
-      <div id="tab-scan" class="card tab">
-        <h1>Scan</h1>
-        <div class="row">
-          <input id="target" placeholder="example.com" autofocus>
-          <button id="scanBtn">Start</button>
-        </div>
-        <div class="progress"><div id="bar"></div></div>
-        <div id="status" class="small">Status: idle</div>
-        <hr>
-        <div id="output" class="pre">Results will appear here...</div>
-        <div class="row" style="margin-top:12px;">
-          <button id="exportBtn">Export JSON</button>
-          <button id="clearHistoryBtn">Clear History</button>
-        </div>
-      </div>
+    <div class="row">
+      <input id="target" placeholder="example.com">
+      <input id="wpver" placeholder="WP version (e.g. 6.2.1)">
+      <button onclick="runScan()">Scan</button>
+    </div>
 
-      <div id="tab-lab" class="card tab" style="display:none;">
-        <h1>Lab</h1>
-        <div class="row">
-          <input id="labEndpoint" placeholder="/?q=test">
-          <select id="labMethod">
-            <option>GET</option>
-            <option>POST</option>
-          </select>
-          <button id="labBtn">Send</button>
-        </div>
-        <textarea id="labPayload" placeholder="payload (optional)" style="margin-top:12px;" rows="4"></textarea>
-        <div id="labOut" class="pre" style="margin-top:12px;">Lab output...</div>
-      </div>
+    <div class="row">
+      <input id="plugins" placeholder="Plugins (comma separated, e.g. elementor,contact-form-7)">
+      <input id="themes" placeholder="Themes (comma separated, e.g. astra,twentytwentythree)">
+    </div>
 
-      <div id="tab-history" class="card tab" style="display:none;">
-        <h1>History</h1>
-        <div id="historyOut" class="pre">No history yet.</div>
-      </div>
+    <div id="output" class="pre">Results will appear here…</div>
+
+    <div class="footer">
+      ⚠️ Passive only · No HTTP requests · CVE matched by version/name heuristic
     </div>
   </div>
 </div>
 
 <script>
-const PROXY_BASE = "https://r.jina.ai/http://"; // correct proxy
-const headersCheck = ["content-security-policy","strict-transport-security","x-frame-options","x-content-type-options","referrer-policy","permissions-policy"];
-let lastReport = null;
-
-function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
-function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
-
-function cleanDomain(d){
-  d = d.trim().toLowerCase();
-  d = d.replace(/^https?:\/\//, "");
-  d = d.replace(/^www\./, "");
-  d = d.split("/")[0];
-  return d;
-}
-
-async function timeoutFetch(url,ms=8000){
-  const c = new AbortController();
-  setTimeout(()=>c.abort(), ms);
-  return fetch(url, {signal:c.signal});
-}
-
-async function scanHTTP(domain){
-  const r = await timeoutFetch(PROXY_BASE + domain, 8000);
-  const text = await r.text();
-  let headersObj = {};
-  r.headers.forEach((v,k)=> headersObj[k]=v);
-  return {status:r.status, url:r.url, headers:headersObj, body:text, https:r.url.startsWith("https")};
-}
-
-function scanHeaders(h){
-  return headersCheck.map(x=>({name:x, ok:!!h[x]}));
-}
-
-function techFingerprint(http){
-  const tech=[];
-  const body=http.body||"";
-  const server=http.headers["server"]||"";
-  const patterns = [
-    ["WordPress", /wp-content|wp-includes/i],
-    ["Joomla", /Joomla!/i],
-    ["Drupal", /drupal/i],
-    ["Magento", /Magento/i],
-    ["Shopify", /shopify/i],
-    ["Laravel", /laravel/i],
-    ["Express", /express/i],
-    ["Django", /django/i],
-    ["Next.js", /next\.js/i],
-    ["React", /react/i],
-    ["Angular", /angular/i]
-  ];
-  patterns.forEach(p=>{
-    if(p[1].test(body) || server.toLowerCase().includes(p[0].toLowerCase())){
-      tech.push(p[0]);
-    }
-  });
-  return [...new Set(tech)];
-}
-
-function detectWAF(headers, body){
-  const waf=[];
-  const h=k=> (headers[k]||"").toLowerCase();
-  const b=(body||"").toLowerCase();
-  if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
-  if(h("x-sucuri-id")||b.includes("sucuri firewall")) waf.push("Sucuri");
-  if(h("x-akamai-transformed")||b.includes("akamai-ghost")) waf.push("Akamai");
-  if(h("x-incapsula")||b.includes("incapsula")) waf.push("Imperva");
-  if(h("x-waf")||h("x-firewall")) waf.push("Generic WAF");
-  let level="None";
-  if(waf.length){
-    level = waf.some(x=>["Cloudflare","Akamai","Imperva"].includes(x)) ? "High" : "Medium";
-  }
-  return {vendors:[...new Set(waf)], level};
-}
-
-function detectCMSVersion(body){
-  const v=[];
-  const wp = body.match(/wp-content\/themes\/[^\/]+\/style\.css.*?Version:\s*([0-9.]+)/i);
-  if(wp) v.push(`WordPress: ${wp[1]}`);
-  return v;
-}
-
-const adminPaths = [
-  "/wp-login.php","/wp-admin/","/wp-admin/admin-ajax.php","/wp-admin/setup-config.php","/wp-admin/install.php",
-  "/xmlrpc.php","/wp-json/","/wp-content/","/admin","/administrator","/login","/admin/login","/adminpanel",
-  "/cpanel","/user/login"
+/* =========================
+   STATIC CVE DATABASE
+========================= */
+const WP_CORE_CVE = [
+ {cve:"CVE-2022-21661",affected:"<5.8.3",sev:"High",desc:"SQL Injection via WP_Query"},
+ {cve:"CVE-2023-2745",affected:"<6.2.1",sev:"High",desc:"Auth bypass REST API"},
+ {cve:"CVE-2023-4515",affected:"<6.3.1",sev:"Medium",desc:"Stored XSS block editor"}
 ];
 
-async function detectAdmin(domain){
-  const found=[];
-  for(const p of adminPaths){
-    try{
-      const r = await timeoutFetch(PROXY_BASE + domain + p, 5000);
-      if(r.status===200){
-        const t = await r.text();
-        if(t.toLowerCase().includes("login") || t.toLowerCase().includes("wp-login") || t.toLowerCase().includes("password")){
-          found.push(p + " => 200");
-        }
-      } else {
-        found.push(p + " => " + r.status);
-      }
-    }catch(e){
-      found.push(p + " => failed");
-    }
-  }
-  return found;
+const WP_PLUGIN_CVE = [
+ {name:"elementor",cve:"CVE-2023-4514",sev:"High",desc:"Unauth file upload"},
+ {name:"contact-form-7",cve:"CVE-2020-35489",sev:"Medium",desc:"Stored XSS"},
+ {name:"woocommerce",cve:"CVE-2021-32790",sev:"High",desc:"Privilege escalation"}
+];
+
+const WP_THEME_CVE = [
+ {name:"astra",cve:"CVE-2022-2982",sev:"Medium",desc:"XSS via customizer"},
+ {name:"twentytwenty",cve:"CVE-2021-29447",sev:"Low",desc:"SVG upload issue"}
+];
+
+/* =========================
+   UTIL
+========================= */
+function cleanDomain(d){
+  return d.trim().toLowerCase().replace(/^https?:\/\//,"").replace(/^www\./,"").split("/")[0];
+}
+function verLess(v,max){
+  const a=v.split(".").map(Number), b=max.split(".").map(Number);
+  for(let i=0;i<3;i++){ if((a[i]||0)!==(b[i]||0)) return (a[i]||0)<(b[i]||0); }
+  return false;
 }
 
-function risk(r){
-  let s=0;
-  if(!r.http.https) s+=20;
-  if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
-  if(r.tech.includes("WordPress")) s+=5;
-  if(r.waf.level==="High") s+=10;
-  return {score:s, level:s<20?"Low":s<40?"Medium":"High"};
+/* =========================
+   MATCHERS
+========================= */
+function matchCore(ver){
+  if(!ver) return [];
+  return WP_CORE_CVE.filter(c=>verLess(ver,c.affected.replace("<","")));
+}
+function matchPlugins(list){
+  if(!list.length) return [];
+  return WP_PLUGIN_CVE.filter(c=>list.includes(c.name));
+}
+function matchThemes(list){
+  if(!list.length) return [];
+  return WP_THEME_CVE.filter(c=>list.includes(c.name));
 }
 
-function saveHistory(report){
-  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  h.unshift({time:new Date().toISOString(), report});
-  localStorage.setItem("orca_history", JSON.stringify(h.slice(0, 20)));
-  renderHistory();
-}
-function renderHistory(){
-  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  if(!h.length){
-    document.getElementById("historyOut").textContent="No history yet.";
-    return;
-  }
-  document.getElementById("historyOut").textContent = h.map(x=>`${x.time}\n${JSON.stringify(x.report,null,2)}`).join("\n\n");
-}
-function clearHistory(){
-  localStorage.removeItem("orca_history");
-  renderHistory();
-}
+/* =========================
+   MAIN
+========================= */
+function runScan(){
+  const domain=cleanDomain(target.value);
+  const wpver=wpverInput();
+  const plugins=parseList(pluginsInput());
+  const themes=parseList(themesInput());
 
-async function runScan(){
-  const target = cleanDomain(document.getElementById("target").value);
-  if(!target) return;
-  document.getElementById("status").textContent="Status: scanning...";
-  setProgress(10);
+  const core=matchCore(wpver);
+  const pcve=matchPlugins(plugins);
+  const tcve=matchThemes(themes);
 
-  try{
-    const r = {};
-    r.http = await scanHTTP(target);
-    setProgress(35);
+  output.textContent=
+`Target
+------
+${domain}
 
-    r.tech = techFingerprint(r.http);
-    r.headers = scanHeaders(r.http.headers);
-    r.waf = detectWAF(r.http.headers, r.http.body);
-    r.version = detectCMSVersion(r.http.body);
-    setProgress(55);
+WordPress Version
+----------------
+${wpver || "Not provided"}
 
-    r.admin = await detectAdmin(target);
-    setProgress(80);
+[ Core CVE Match ]
+-----------------
+${core.length?core.map(c=>`• ${c.cve} [${c.sev}] ${c.desc} (Affected ${c.affected})`).join("\n"):"None"}
 
-    r.risk = risk(r);
-    setProgress(100);
+[ Plugin CVE Match ]
+-------------------
+${pcve.length?pcve.map(c=>`• ${c.name} → ${c.cve} [${c.sev}] ${c.desc}`).join("\n"):"None"}
 
-    lastReport = r;
-    saveHistory(r);
+[ Theme CVE Match ]
+------------------
+${tcve.length?tcve.map(c=>`• ${c.name} → ${c.cve} [${c.sev}] ${c.desc}`).join("\n"):"None"}
 
-    document.getElementById("output").innerHTML =
-      `HTTP Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}
-HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
-
-Tech: ${r.tech.join(", ")||"None"}
-CMS Version: ${r.version.join(", ")||"None"}
-
-WAF: ${r.waf.vendors.join(", ")||"None"} (${r.waf.level})
-Risk: ${r.risk.level} (score ${r.risk.score})
-
-Admin Login Paths:
-${r.admin.join("\n")}`;
-
-    document.getElementById("status").textContent="Status: done";
-  }catch(e){
-    document.getElementById("output").textContent="Scan failed (proxy/CORS/timeout).";
-    document.getElementById("status").textContent="Status: failed";
-    setProgress(0);
-  }
+Scan Mode
+---------
+Passive CVE Matching (Offline DB)
+`;
 }
 
-function exportReport(){
-  if(!lastReport){
-    alert("No report to export.");
-    return;
-  }
-  const blob = new Blob([JSON.stringify(lastReport,null,2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download="orca_report.json"; a.click();
-  URL.revokeObjectURL(url);
-}
-
-// Lab
-async function labTest(){
-  const domain = cleanDomain(document.getElementById("target").value);
-  if(!domain){ document.getElementById("labOut").textContent="Enter target first."; return; }
-
-  const ep = document.getElementById("labEndpoint").value.trim();
-  const method = document.getElementById("labMethod").value;
-  const payload = document.getElementById("labPayload").value.trim();
-
-  if(!ep){ document.getElementById("labOut").textContent="Endpoint required."; return; }
-
-  const url = PROXY_BASE + domain + (ep.startsWith("/") ? ep : "/" + ep);
-
-  try{
-    const res = await timeoutFetch(url, 8000);
-    const text = await res.text();
-    document.getElementById("labOut").textContent =
-      `Status: ${res.status}
-URL: ${res.url}
-Response snippet:
-${text.slice(0, 500)}`;
-  }catch(e){
-    document.getElementById("labOut").textContent="Lab request failed (CORS/proxy/timeout).";
-  }
-}
-
-// Theme
-function toggleTheme(){
-  const root = document.documentElement;
-  const t = root.getAttribute("data-theme");
-  root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
-}
-
-// Tabs
-document.querySelectorAll(".navbtn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    const tab = btn.getAttribute("data-tab");
-    document.querySelectorAll(".tab").forEach(t=>t.style.display="none");
-    document.getElementById("tab-"+tab).style.display="block";
-  });
-});
-
-document.getElementById("scanBtn").addEventListener("click", runScan);
-document.getElementById("exportBtn").addEventListener("click", exportReport);
-document.getElementById("clearHistoryBtn").addEventListener("click", clearHistory);
-document.getElementById("labBtn").addEventListener("click", labTest);
-document.getElementById("themeBtn").addEventListener("click", toggleTheme);
-
-document.getElementById("target").addEventListener("keydown", (e)=>{
-  if(e.key==="Enter") runScan();
-});
-
-renderHistory();
+function wpverInput(){return document.getElementById("wpver").value.trim();}
+function pluginsInput(){return document.getElementById("plugins").value;}
+function themesInput(){return document.getElementById("themes").value;}
+function parseList(v){return v.toLowerCase().split(",").map(x=>x.trim()).filter(Boolean);}
 </script>
 </body>
 </html>
