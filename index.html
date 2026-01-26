@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WP LAB (FIXED)</title>
+<title>ORCA WebScan – Ultimate LAB</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
@@ -10,8 +10,9 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;height:100vh}
 .sidebar{width:260px;background:var(--panel);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sidebar h2{margin:0}
 .sidebar button{padding:12px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer}
-.sidebar .ghost{background:transparent;border:1px solid var(--accent)}
+.sidebar .ghost{background:transparent;border:1px solid var(--accent);color:var(--text)}
 .main{flex:1;padding:24px;overflow:auto}
 .card{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:16px}
 input{width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:8px}
@@ -33,7 +34,7 @@ small{opacity:.7}
   <h1>ORCA WebScan – WordPress LAB</h1>
   <div class="card">
     <input id="target" placeholder="https://example.com (ENTER)">
-    <small>Passive · SAFE · LAB only</small>
+    <small>Passive • SAFE MODE • Academic / LAB</small>
   </div>
   <div class="card">
     <pre id="out">Idle.</pre>
@@ -41,71 +42,111 @@ small{opacity:.7}
 </div>
 
 <script>
-/* ========== LOG SYSTEM (ANTI OVERWRITE) ========== */
+/* ================= LOG SYSTEM ================= */
 const log=[];
+const out=document.getElementById("out");
 const add=t=>log.push(t);
 const render=()=>out.textContent=log.join("\n");
 const clearLog=()=>{log.length=0;};
 
-/* ========== UI ========== */
-const out=document.getElementById("out");
+/* ================= UI ================= */
 const target=document.getElementById("target");
 target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
 function toggleTheme(){document.body.classList.toggle("light");}
 
-/* ========== SAFE FETCH ========== */
+/* ================= SAFE FETCH ================= */
 async function fetchSafe(u){
   try{return await fetch(u,{redirect:"manual"});}catch{return null;}
 }
 
-/* ========== PLUGIN DB ========== */
+/* ================= DATABASE ================= */
 const pluginDB=[
  {name:"elementor",path:"/wp-content/plugins/elementor/"},
  {name:"revslider",path:"/wp-content/plugins/revslider/"},
  {name:"wp-file-manager",path:"/wp-content/plugins/wp-file-manager/"}
 ];
 
-/* ========== MAIN SCAN ========== */
+const rceTests=[
+ "/?cmd=id",
+ "/?exec=whoami",
+ "/wp-admin/admin-ajax.php?action=test"
+];
+
+/* ================= MAIN SCAN ================= */
 async function scan(){
   clearLog();
   const base=target.value.replace(/\/$/,"");
   if(!base) return;
 
-  add("Target");
-  add("=======");
+  add("Scanning target");
+  add("===============");
   add(base+"\n");
   render();
 
   const home=await fetchSafe(base);
-  if(!home){add("Unreachable");render();return;}
+  if(!home){
+    add("Target unreachable");
+    render();
+    return;
+  }
+
   const html=await home.text();
 
-  await detectWP(html);
-  await enumUsers(base,html);
+  await detectServer(home);
+  const wpResult=await detectWordPress(base,html);
+  await enumUsers(base,html,wpResult.backend);
   await detectPlugins(base,html);
 
-  add("\nScan finished.");
+  add("\nScan completed.");
   render();
 }
 
-/* ========== WP DETECT ========== */
-async function detectWP(html){
-  add("WordPress");
-  add("----------");
-  add(/wp-content|wp-includes/i.test(html)?"YES":"NO");
+/* ================= SERVER ================= */
+async function detectServer(resp){
+  add("Server / CDN");
+  add("------------");
+  add(resp.headers.get("server")||"hidden");
+  if(resp.headers.get("cf-ray")) add("Cloudflare detected");
   add("");
 }
 
-/* ========== USER ENUM (FIXED & STRONG) ========== */
-async function enumUsers(base,html){
+/* ================= WORDPRESS LOGIC ================= */
+async function detectWordPress(base,html){
+  let frontend=false;
+  let backend=false;
+
+  if(/wp-content|wp-includes/i.test(html)) frontend=true;
+
+  for(const p of pluginDB){
+    const r=await fetchSafe(base+p.path);
+    if(r && r.status===200) backend=true;
+  }
+
+  add("WordPress");
+  add("----------");
+  if(frontend && backend) add("YES (Frontend + Backend)");
+  else if(backend) add("BACKEND DETECTED (behind CDN / static frontend)");
+  else if(frontend) add("FRONTEND INDICATION ONLY");
+  else add("NO direct indicator (may be fully hidden)");
+  add("");
+
+  return {frontend,backend};
+}
+
+/* ================= USER ENUMERATION ================= */
+async function enumUsers(base,html,backend){
   add("User Enumeration");
   add("-----------------");
   const users=new Set();
+  let blocked=true;
 
   // REST API
   const api=await fetchSafe(base+"/wp-json/wp/v2/users");
   if(api && api.status===200){
-    try{(await api.json()).forEach(u=>users.add(u.slug));}catch{}
+    try{
+      (await api.json()).forEach(u=>users.add(u.slug));
+      blocked=false;
+    }catch{}
   }
 
   // Author redirect
@@ -113,27 +154,33 @@ async function enumUsers(base,html){
     const r=await fetchSafe(base+"/?author="+i);
     if(r && r.url){
       const m=r.url.match(/\/author\/([^\/]+)/);
-      if(m) users.add(m[1]);
+      if(m){
+        users.add(m[1]);
+        blocked=false;
+      }
     }
   }
 
-  // HTML author link fallback
+  // HTML fallback
   [...html.matchAll(/\/author\/([a-z0-9_-]+)/gi)]
-    .forEach(m=>users.add(m[1]));
+    .forEach(m=>{users.add(m[1]);blocked=false;});
 
   if(users.size){
     users.forEach(u=>add("User: "+u));
+  }else if(!backend){
+    add("Skipped (WordPress backend not exposed)");
+  }else if(blocked){
+    add("Enumeration blocked (REST & author hardened)");
   }else{
-    add("No users found (target likely hardened)");
+    add("No users discovered");
   }
   add("");
 }
 
-/* ========== PLUGIN DETECT (HTML + VERIFY) ========== */
+/* ================= PLUGIN DETECTION ================= */
 async function detectPlugins(base,html){
   add("Plugin Detection");
   add("----------------");
-
   const found=new Set();
 
   // HTML fingerprint
@@ -155,27 +202,40 @@ async function detectPlugins(base,html){
   add("");
 }
 
-/* ========== RCE VALIDATION ========== */
+/* ================= RCE VALIDATION ================= */
 async function rceValidate(){
   const base=target.value.replace(/\/$/,"");
   if(!base) return;
 
   add("\nRCE Validation (SAFE)");
   add("--------------------");
-  const tests=["/?cmd=id","/?exec=whoami"];
   let score=0;
 
-  for(const t of tests){
+  for(const t of rceTests){
     const r=await fetchSafe(base+t);
-    if(!r){add(t+" → blocked");continue;}
+    if(!r){
+      add(t+" → blocked");
+      continue;
+    }
     const txt=await r.text();
-    if(/uid=|gid=|root:/i.test(txt)){add(t+" → EXEC STRING");score+=2;}
-    else if(/error|warning/i.test(txt)){add(t+" → ERROR LEAK");score+=1;}
-    else add(t+" → OK");
+
+    if(/uid=|gid=|root:/i.test(txt)){
+      add(t+" → EXEC STRING [HIGH]");
+      score+=3;
+    }else if(/warning|error|fatal/i.test(txt)){
+      add(t+" → ERROR LEAK [MEDIUM]");
+      score+=2;
+    }else{
+      add(t+" → OK");
+    }
   }
 
-  add(score>=2?"LIKELY VULNERABLE":"NO RCE INDICATION");
-  add("SAFE MODE – no payload");
+  add("\nResult");
+  add("------");
+  add(score>=5?"LIKELY VULNERABLE (HIGH)":
+      score>=2?"POTENTIAL (MEDIUM)":
+      "No RCE indication (LOW)");
+  add("SAFE MODE – no payload executed");
   render();
 }
 </script>
