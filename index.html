@@ -83,8 +83,7 @@ pre{
 <div class="sidebar">
   <h2>🛡️ ORCA</h2>
   <button onclick="scan()">Scan Target</button>
-  <button class="ghost" onclick="openBrute()">Brute Force (LAB)</button>
-  <button class="ghost" onclick="smartBrute()">Smart Brute (LAB)</button>
+  <button class="ghost" onclick="bruteForce()">Brute Force (LAB)</button>
   <button class="ghost" onclick="document.getElementById('wordlist').click()">Upload Wordlist</button>
   <button class="ghost" onclick="rceLab()">RCE Validation</button>
   <button class="ghost" onclick="toggleTheme()">🌗 Light / Dark</button>
@@ -192,22 +191,7 @@ document.getElementById("wordlist").addEventListener("change",e=>{
   r.readAsText(f);
 });
 
-/* ================= BRUTE LAB ================= */
-function openBrute(){
-  out(
-`Brute Force Module (LAB)
-------------------------
-Mode : SIMULATION ONLY
-
-• Default WordPress passwords
-• Keyboard-pattern (QWERTY) included
-• Upload custom wordlist supported
-
-No login request sent`
-  );
-}
-
-/* ================= SMART BRUTE ================= */
+/* ================= BRUTE FORCE (SMART LAB) ================= */
 function scorePassword(p){
   let s=0;
   if(p.length<6) s+=3;
@@ -217,7 +201,7 @@ function scorePassword(p){
   return s;
 }
 
-function smartBrute(){
+function bruteForce(){
   const wl=customWL.length?customWL:defaultWL;
   const users=["admin","administrator","editor"];
 
@@ -229,31 +213,32 @@ function smartBrute(){
   const est=Math.ceil(tries/rate);
 
   let log=
-`Smart Brute Force (LAB)
+`Brute Force (SMART LAB)
 -----------------------
-Users        : ${users.join(", ")}
-Wordlist     : ${scored.length}
-Total tries  : ${tries}
-Rate limit   : ${rate}/min
-Est. time    : ~${est} min
+Mode        : SIMULATION ONLY
+Users       : ${users.join(", ")}
+Wordlist    : ${scored.length}
+Total tries : ${tries}
+Rate limit  : ${rate}/min
+Est. time   : ~${est} min
 
-Top Priority
-------------\n`;
+Top Priority Passwords
+---------------------\n`;
 
-  scored.slice(0,7).forEach(x=>{
-    log+=` - ${x.p} (risk: ${x.score})\n`;
+  scored.slice(0,8).forEach(x=>{
+    log+=` - ${x.p} (risk score: ${x.score})\n`;
   });
 
   log+=`
 Insight
 -------
-• Keyboard-pattern passwords very common
-• High chance of lockout if real brute attempted
-• Smart strategy = low & slow
+• Keyboard-pattern passwords (QWERTY) very common
+• Real brute force likely blocked by security plugin
+• Recommended strategy: low & slow
 
 Status
 ------
-LAB SAFE MODE
+LAB SAFE MODE – no request sent
 `;
   out(log);
 }
@@ -265,9 +250,7 @@ function rceLab(){
 --------------------
 Simulation only
 No payload execution
-Response fingerprinting only
-
-(placeholder)`
+Response fingerprinting placeholder`
   );
 }
 
