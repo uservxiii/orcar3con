@@ -1,44 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>ORCA WebScan</title>
-<meta name="viewport" content="width=device-width">
+<meta charset="UTF-8">
+<title>ORCA Web Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body{margin:0;background:#0b1220;color:#e9efff;font-family:monospace}
-.wrap{max-width:1100px;margin:auto;padding:20px}
-input,button{font-family:monospace;padding:10px}
-button{cursor:pointer}
-pre{background:#050814;padding:16px;border-radius:8px;white-space:pre-wrap}
+:root{
+  --bg:#0b1220;
+  --panel:#121a2c;
+  --text:#e9efff;
+  --accent:#4f7cff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:ui-monospace, SFMono-Regular, Menlo, monospace;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  height:100vh;
+}
+.sidebar{
+  width:260px;
+  background:var(--panel);
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.sidebar h2{margin:0}
+.sidebar button{
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  background:var(--accent);
+  color:#fff;
+  cursor:pointer;
+}
+.main{
+  flex:1;
+  padding:20px;
+  overflow:auto;
+}
+.card{
+  background:var(--panel);
+  border-radius:14px;
+  padding:16px;
+  margin-bottom:14px;
+}
+input{
+  width:100%;
+  padding:12px;
+  border-radius:8px;
+  border:none;
+}
+pre{
+  background:#0a1020;
+  color:#cde;
+  padding:16px;
+  border-radius:12px;
+  white-space:pre-wrap;
+  line-height:1.4;
+}
 </style>
 </head>
+
 <body>
-<div class="wrap">
-<h1>ORCA WebScan</h1>
+<div class="sidebar">
+  <h2>🛡️ ORCA</h2>
+  <button onclick="scan()">Scan Target</button>
+</div>
 
-<input id="t" placeholder="https://target.tld" style="width:70%">
-<button onclick="scan()">SCAN</button>
+<div class="main">
+  <h1>ORCA Web Scanner</h1>
 
-<pre id="out">Idle.</pre>
+  <div class="card">
+    <input id="target" placeholder="https://target.tld  (ENTER)">
+  </div>
+
+  <div class="card">
+    <pre id="out">Idle.</pre>
+  </div>
 </div>
 
 <script>
-const out=document.getElementById("out");
+/* ================= CORE LOG ================= */
 const log=[];
 const add=t=>log.push(t);
 const render=()=>out.textContent=log.join("\n");
-const clear=()=>log.length=0;
+const clear=()=>{log.length=0};
+const out=document.getElementById("out");
+const target=document.getElementById("target");
+target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
 
-async function get(u){
-  const r=await fetch("?fetch="+encodeURIComponent(u));
-  if(!r.ok) return null;
-  return r;
+/* ================= SAFE FETCH ================= */
+async function fetchSafe(url){
+  try{
+    return await fetch(url,{redirect:"manual"});
+  }catch(e){
+    return null;
+  }
 }
 
-/* ================= SCAN ================= */
+/* ================= CMS DETECTION ================= */
+function detectCMS(html, headers){
+  if(/wp-content|wp-includes|wp-emoji-release/i.test(html)) return "WordPress";
+  if(/Joomla!|\/components\/com_/i.test(html)) return "Joomla";
+  if(/Drupal|drupal-settings-json/i.test(html)) return "Drupal";
+  return "Static / Unknown";
+}
+
+/* ================= MAIN SCAN ================= */
 async function scan(){
   clear();
-  const base=document.getElementById("t").value.replace(/\/$/,"");
+  const base=target.value.replace(/\/$/,"");
   if(!base) return;
 
   add("Scanning target");
@@ -46,95 +122,111 @@ async function scan(){
   add(base+"\n");
   render();
 
-  const r=await get(base);
-  if(!r){ add("Target unreachable"); return render(); }
+  const res=await fetchSafe(base);
+  if(!res){ add("Target unreachable"); render(); return; }
 
-  const html=await r.text();
-  const server=r.headers.get("server")||"hidden";
+  const html=await res.text();
 
+  /* SERVER */
   add("Server / CDN");
   add("------------");
-  add(server+"\n");
+  add(res.headers.get("server")||"hidden");
+  if(res.headers.get("cf-ray")) add("Cloudflare detected");
+  add("");
 
-  /* CMS DETECT */
-  let cms="Static / Other";
-  if(/wp-content|wp-includes|wordpress/i.test(html)) cms="WordPress";
-  else if(/Joomla!|com_content/i.test(html)) cms="Joomla";
-  else if(/Drupal.settings|drupal/i.test(html)) cms="Drupal";
-
-  add("CMS");
-  add("---");
+  /* CMS */
+  const cms=detectCMS(html,res.headers);
+  add("CMS Detection");
+  add("-------------");
   add(cms+"\n");
 
-  if(cms==="WordPress"){
-    await wpUsers(base);
-    await wpPlugins(html);
+  /* WORDPRESS CHECK */
+  if(cms!=="WordPress"){
+    add("WordPress");
+    add("----------");
+    add("NO");
+    add("\nWP modules skipped");
+    render();
+    return;
   }
+
+  add("WordPress");
+  add("----------");
+  add("YES\n");
+
+  await enumUsers(base);
+  await pluginFingerprint(html);
 
   add("\nScan completed.");
   render();
 }
 
-/* ================= USERS ================= */
-async function wpUsers(base){
+/* ================= USER ENUMERATION ================= */
+async function enumUsers(base){
   add("User Enumeration");
   add("-----------------");
 
-  const r=await get(base+"/wp-json/wp/v2/users");
-  if(!r || r.status!==200){
-    add("No users discovered\n");
-    return;
-  }
-  try{
-    const j=await r.json();
-    if(!j.length){ add("No users discovered\n"); return; }
-    j.forEach(u=>add("User: "+u.slug));
-    add("");
-  }catch{
-    add("No users discovered\n");
-  }
-}
-
-/* ================= PLUGINS ================= */
-const pluginDB={
-  "revslider":{
-    re:/revslider/i,
-    cves:[
-      ["CVE-2014-9734","RevSlider arbitrary file upload → RCE"]
-    ]
-  },
-  "wp-file-manager":{
-    re:/wp-file-manager/i,
-    cves:[
-      ["CVE-2020-25213","Unauthenticated file upload → RCE"]
-    ]
-  },
-  "elementor":{
-    re:/elementor/i,
-    cves:[
-      ["CVE-2023-48777","Template import → code execution"]
-    ]
-  }
-};
-
-async function wpPlugins(html){
-  add("Plugin RCE Fingerprint");
-  add("----------------------");
-
   let found=false;
-  for(const p in pluginDB){
-    if(pluginDB[p].re.test(html)){
-      found=true;
-      add("Plugin : "+p);
-      pluginDB[p].cves.forEach(c=>{
-        add("CVE    : "+c[0]);
-        add(" ↳ "+c[1]);
-      });
-      add("");
+
+  /* wp-json */
+  const api=await fetchSafe(base+"/wp-json/wp/v2/users");
+  if(api){
+    if(api.status===200){
+      try{
+        const j=await api.json();
+        j.forEach(u=>{
+          add("User: "+u.slug);
+          found=true;
+        });
+      }catch{
+        add("wp-json returned non-JSON");
+      }
+    }else{
+      add("wp-json blocked ("+api.status+")");
+    }
+  }else{
+    add("wp-json unreachable (CORS / network)");
+  }
+
+  /* author enum */
+  for(let i=1;i<=5;i++){
+    const r=await fetchSafe(base+"/?author="+i);
+    if(r && r.url){
+      const m=r.url.match(/\/author\/([^\/]+)/);
+      if(m){
+        add("User: "+m[1]);
+        found=true;
+      }
     }
   }
-  if(!found) add("No plugin fingerprint detected\n");
+
+  if(!found) add("No users discovered");
+  add("");
 }
+
+/* ================= PLUGIN FINGERPRINT (HTML/JS) ================= */
+function pluginFingerprint(html){
+  add("Plugin Fingerprint");
+  add("------------------");
+
+  const plugins=[
+    {name:"elementor", re:/elementor/i},
+    {name:"revslider", re:/revslider|slider-revolution/i},
+    {name:"wp-file-manager", re:/wp-file-manager|elfinder/i}
+  ];
+
+  let hit=false;
+  plugins.forEach(p=>{
+    if(p.re.test(html)){
+      add("Plugin: "+p.name);
+      hit=true;
+    }
+  });
+
+  if(!hit) add("No plugin fingerprint from HTML");
+}
+
+/* ================================================= */
 </script>
 </body>
 </html>
