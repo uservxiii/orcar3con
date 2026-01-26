@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress LAB (FINAL)</title>
+<title>ORCA WebScan – WordPress LAB FINAL</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
@@ -18,11 +18,6 @@ body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);displ
 input{width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:8px}
 pre{background:#0a1020;color:#cde;padding:16px;border-radius:14px;white-space:pre-wrap}
 .light pre{background:#eef2ff;color:#111}
-small{opacity:.7}
-.tag{display:inline-block;padding:2px 8px;border-radius:8px;font-size:12px;margin-left:6px}
-.low{background:#2b5}
-.med{background:#e9a93a}
-.high{background:#e55353}
 </style>
 </head>
 
@@ -40,17 +35,15 @@ small{opacity:.7}
 
   <div class="card">
     <input id="target" placeholder="https://example.com (ENTER)">
-    <small>Passive scan · SAFE MODE · No exploitation</small>
   </div>
 
   <div class="card" id="brute" style="display:none">
-    <h3>Brute Force LAB (Simulation)</h3>
     <input id="loginUrl" placeholder="/wp-login.php">
     <input id="singleUser" placeholder="Username (optional)">
     <input type="file" id="userWL">
     <input id="singlePass" placeholder="Password (optional)">
     <input type="file" id="passWL">
-    <button onclick="runBrute()">Run Simulation</button>
+    <button onclick="runBrute()">Run Brute Simulation</button>
   </div>
 
   <div class="card">
@@ -59,54 +52,30 @@ small{opacity:.7}
 </div>
 
 <script>
-/* ================= CORE ================= */
+/* ========= CORE ========= */
 const out=t=>document.getElementById("out").textContent=t;
-const add=t=>document.getElementById("out").textContent+=t+"\n";
+const add=t=>out(document.getElementById("out").textContent+t+"\n");
 const target=document.getElementById("target");
 target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
-
 function toggleTheme(){document.body.classList.toggle("light");}
-function toggleBrute(){
-  const b=document.getElementById("brute");
-  b.style.display=b.style.display==="none"?"block":"none";
-}
-async function fetchSafe(u){
-  try{return await fetch(u,{redirect:"manual"});}catch{return null;}
-}
+function toggleBrute(){brute.style.display=brute.style.display==="none"?"block":"none";}
+async function fetchSafe(u){try{return await fetch(u);}catch{return null;}}
 
-/* ================= PLUGIN RCE FINGERPRINT DB (SAFE) ================= */
-const pluginFingerprints=[
-  {
-    plugin:"revslider",
-    path:"/wp-content/plugins/revslider/",
-    hints:["upload","zip","slider"],
-    cves:["CVE-2014-9734"],
-    risk:"HIGH"
-  },
-  {
-    plugin:"wp-file-manager",
-    path:"/wp-content/plugins/wp-file-manager/",
-    hints:["connector","elfinder"],
-    cves:["CVE-2020-25213"],
-    risk:"HIGH"
-  },
-  {
-    plugin:"elementor",
-    path:"/wp-content/plugins/elementor/",
-    hints:["ajax","editor"],
-    cves:["CVE-2023-48777"],
-    risk:"MEDIUM"
-  }
-];
-
-/* ================= CVE MATCHER (OFFLINE DEMO) ================= */
-const cveDB={
-  "CVE-2014-9734":"RevSlider arbitrary file upload leading to RCE",
+/* ========= PLUGIN DB ========= */
+const pluginDB={
+  "revslider":["CVE-2014-9734"],
+  "wp-file-manager":["CVE-2020-25213"],
+  "elementor":["CVE-2023-48777"],
+  "woocommerce":[],
+  "contact-form-7":[]
+};
+const cveInfo={
+  "CVE-2014-9734":"RevSlider file upload RCE",
   "CVE-2020-25213":"WP File Manager unauthenticated RCE",
-  "CVE-2023-48777":"Elementor RCE via template import"
+  "CVE-2023-48777":"Elementor template import RCE"
 };
 
-/* ================= SCAN ================= */
+/* ========= SCAN ========= */
 async function scan(){
   const base=target.value.replace(/\/$/,"");
   if(!base)return;
@@ -116,106 +85,120 @@ async function scan(){
   if(!home){out("Target unreachable");return;}
   const html=await home.text();
 
-  add("Target\n------");
-  add(base+"\n");
+  add("Target\n------\n"+base+"\n");
 
+  /* Server / CDN */
   add("Server / CDN\n------------");
-  const server=home.headers.get("server")||"hidden";
+  const server=home.headers.get("server")||"Hidden";
   add(server);
   if(home.headers.get("cf-ray")) add("Cloudflare detected");
   add("");
 
-  add("WordPress\n----------");
-  add(/wp-content|wp-includes/i.test(html)?"YES":"NO");
-  add("");
+  /* cdn-cgi trace */
+  const trace=await fetchSafe(base+"/cdn-cgi/trace");
+  if(trace && trace.status===200){
+    add("Cloudflare Trace\n-----------------");
+    add(await trace.text());
+  }
 
-  await pluginFingerprint(base);
+  /* WordPress */
+  add("\nWordPress\n---------");
+  add(/wp-content|wp-includes/i.test(html)?"Detected":"Not detected");
+
+  /* USERS enum */
+  await enumUsers(base);
+
+  /* Plugin auto-detect */
+  await detectPlugins(base,html);
+
   add("\nScan completed.");
 }
 
-/* ================= PLUGIN RCE FINGERPRINT ================= */
-async function pluginFingerprint(base){
-  add("Plugin RCE Fingerprint\n----------------------");
-  let found=0;
+/* ========= USER ENUM ========= */
+async function enumUsers(base){
+  add("\nUsers (Merged)\n--------------");
+  const users=new Map();
 
-  for(const p of pluginFingerprints){
-    const r=await fetchSafe(base+p.path);
-    if(!r) continue;
-
-    let confidence="LOW";
-    if(r.status===200) confidence="MEDIUM";
-    if(r.status===200 && p.risk==="HIGH") confidence="HIGH";
-
-    found++;
-    add(
-      `Plugin : ${p.plugin}
-Path   : ${p.path}
-Risk   : ${p.risk}
-Confidence : ${confidence}
-CVE    : ${p.cves.join(", ")}`
-    );
-
-    p.cves.forEach(c=>{
-      if(cveDB[c]){
-        add(` ↳ ${c} : ${cveDB[c]}`);
-      }
-    });
-    add("");
+  const rest=await fetchSafe(base+"/wp-json/wp/v2/users");
+  if(rest && rest.status===200){
+    try{
+      const d=await rest.json();
+      d.forEach(u=>users.set(u.slug,{slug:u.slug,source:"REST"}));
+    }catch{}
   }
 
-  if(!found){
-    add("No known vulnerable plugin fingerprint detected");
+  for(let i=1;i<=5;i++){
+    const r=await fetchSafe(base+"/?author="+i);
+    if(r && r.redirected){
+      const m=r.url.match(/\/author\/([^\/]+)/);
+      if(m){
+        const slug=m[1];
+        if(users.has(slug)) users.get(slug).source+="+AUTHOR";
+        else users.set(slug,{slug,source:"AUTHOR"});
+      }
+    }
+  }
+
+  users.forEach(u=>{
+    add(`- ${u.slug} (${u.source})`);
+  });
+
+  if(!users.size) add("No users exposed");
+}
+
+/* ========= PLUGIN AUTO DETECT ========= */
+async function detectPlugins(base,html){
+  add("\nPlugins (Auto-detect)\n---------------------");
+
+  const found=[...new Set(
+    [...html.matchAll(/wp-content\/plugins\/([a-z0-9-_]+)/gi)].map(m=>m[1])
+  )];
+
+  if(!found.length){add("No plugin detected");return;}
+
+  for(const p of found){
+    let confidence="LOW";
+    const path=await fetchSafe(base+"/wp-content/plugins/"+p+"/");
+    if(path && path.status===200) confidence="HIGH";
+    else confidence="MEDIUM";
+
+    add(`Plugin : ${p}`);
+    add(`Confidence : ${confidence}`);
+
+    if(pluginDB[p]){
+      pluginDB[p].forEach(c=>{
+        add(`CVE : ${c} → ${cveInfo[c]||"Info unavailable"}`);
+      });
+    }
+    add("");
   }
 }
 
-/* ================= RCE VALIDATION ================= */
+/* ========= RCE VALIDATION ========= */
 async function rceValidate(){
   const base=target.value.replace(/\/$/,"");
   if(!base)return;
-  out("RCE Validation (LAB)\n");
-
-  const tests=[
-    "/?cmd=id",
-    "/?exec=whoami",
-    "/wp-admin/admin-ajax.php?action=test"
-  ];
-
+  out("RCE Validation (SAFE)\n");
+  const tests=["/?cmd=id","/?exec=whoami"];
   let score=0;
 
   for(const t of tests){
     const r=await fetchSafe(base+t);
-    if(!r){ add(`${t} → blocked`); continue; }
+    if(!r){add(`${t} blocked`);continue;}
     const txt=await r.text();
-    let flag="OK";
-    let conf="LOW";
-
-    if(/uid=|gid=|root:/i.test(txt)){flag="EXEC STRING";conf="HIGH";score+=3;}
-    else if(/warning|fatal error/i.test(txt)){flag="ERROR LEAK";conf="MEDIUM";score+=2;}
-    else if(r.status===200){flag="UNEXPECTED RESPONSE";conf="LOW";score+=1;}
-
-    add(`${t} → ${flag} [${conf}]`);
+    if(/uid=|root:/i.test(txt)){add(`${t} EXEC STRING [HIGH]`);score+=3;}
+    else if(/error|warning/i.test(txt)){add(`${t} ERROR LEAK [MEDIUM]`);score+=2;}
+    else add(`${t} no indication`);
   }
 
-  add("\nResult\n------");
-  if(score>=5) add("LIKELY VULNERABLE (HIGH confidence)");
-  else if(score>=2) add("POTENTIAL (MEDIUM confidence)");
-  else add("No RCE indication (LOW confidence)");
-
-  add("\nSAFE MODE – no payload executed");
+  add("\nResult");
+  add(score>=5?"LIKELY RCE":"No strong indication");
 }
 
-/* ================= BRUTE LAB ================= */
+/* ========= BRUTE LAB ========= */
 let uWL=[],pWL=[];
-userWL.onchange=e=>{
-  const r=new FileReader();
-  r.onload=()=>uWL=r.result.split(/\r?\n/).filter(Boolean);
-  r.readAsText(e.target.files[0]);
-};
-passWL.onchange=e=>{
-  const r=new FileReader();
-  r.onload=()=>pWL=r.result.split(/\r?\n/).filter(Boolean);
-  r.readAsText(e.target.files[0]);
-};
+userWL.onchange=e=>{const r=new FileReader();r.onload=()=>uWL=r.result.split(/\r?\n/);r.readAsText(e.target.files[0]);};
+passWL.onchange=e=>{const r=new FileReader();r.onload=()=>pWL=r.result.split(/\r?\n/);r.readAsText(e.target.files[0]);};
 
 function runBrute(){
   const url=loginUrl.value||"/wp-login.php";
@@ -229,8 +212,7 @@ Users     : ${users.length}
 Passwords : ${pass.length}
 
 Sample Attempts
----------------
-`;
+---------------\n`;
 
   users.slice(0,1).forEach(u=>{
     pass.slice(0,3).forEach(p=>{
@@ -238,12 +220,7 @@ Sample Attempts
     });
   });
 
-  log+=`
-Status
-------
-SAFE MODE
-No request sent`;
-
+  log+="\nSAFE MODE – no request sent";
   out(log);
 }
 </script>
