@@ -7,7 +7,8 @@
 
 <style>
 :root{
-  --navy:#0b1d3a;--white:#fff;--gray:#f4f6fb;--border:#e0e6f2;
+  --navy:#0b1d3a;--white:#fff;--gray:#f4f6fb;
+  --border:#e0e6f2;--ok:#0a6;--warn:#a80;--err:#a00;
 }
 body{margin:0;font-family:system-ui;background:var(--gray)}
 .container{max-width:900px;margin:auto;padding:20px}
@@ -16,10 +17,11 @@ h1{text-align:center;color:var(--navy)}
 input,button{padding:12px;font-size:16px;border-radius:10px;border:1px solid var(--border)}
 button{background:var(--navy);color:#fff;cursor:pointer}
 pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
-.badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px}
-.ok{background:#d4f8e8;color:#0a6}
-.warn{background:#fff4cc;color:#a80}
-.err{background:#ffd6d6;color:#a00}
+.badge{display:inline-block;padding:4px 8px;border-radius:6px;font-size:12px;margin-left:6px}
+.ok{background:#d4f8e8;color:var(--ok)}
+.warn{background:#fff4cc;color:var(--warn)}
+.err{background:#ffd6d6;color:var(--err)}
+small{color:#666}
 </style>
 </head>
 
@@ -28,6 +30,7 @@ pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
 <h1>ORCA WebScan</h1>
 
 <div class="card">
+<p><small>⚠️ Scan only domains you own or have permission to test.</small></p>
 <input id="target" placeholder="domain.com">
 <button onclick="run()">Scan</button>
 <pre id="out"></pre>
@@ -37,70 +40,146 @@ pre{background:#f7f9ff;padding:15px;border-radius:10px;overflow:auto}
 <script>
 const PROXY="https://r.jina.ai/http://";
 
+const ports=[80,443,8080,8443];
+
+const headersCheck=[
+  "content-security-policy",
+  "strict-transport-security",
+  "x-frame-options",
+  "x-content-type-options",
+  "referrer-policy",
+  "permissions-policy"
+];
+
 function clean(d){
   return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');
 }
 
+function section(t,b){return `\n=== ${t} ===\n${b}\n`; }
+
 async function timeoutFetch(url,ms=8000){
-  const ctrl=new AbortController();
-  setTimeout(()=>ctrl.abort(),ms);
-  const r=await fetch(url,{signal:ctrl.signal});
-  return r;
+  const c=new AbortController();
+  setTimeout(()=>c.abort(),ms);
+  return fetch(url,{signal:c.signal});
 }
 
-async function dns(domain){
-  const r=await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
-  return r.json();
+/* ---------- HTTP ---------- */
+async function scanHTTP(domain){
+  const r=await timeoutFetch(PROXY+"http://"+domain);
+  const text=await r.text();
+  return {
+    status:r.status,
+    url:r.url,
+    headers:r.headers,
+    body:text,
+    https:r.url.startsWith("https")
+  };
 }
 
-function fingerprint(body){
-  const map=[
-    ["WordPress",/wp-content|wp-includes/i],
-    ["Joomla",/Joomla!/i],
-    ["Drupal",/drupal/i],
-    ["Laravel",/laravel/i],
-    ["Cloudflare",/cloudflare/i]
-  ];
-  return map.filter(x=>x[1].test(body)).map(x=>x[0]);
+/* ---------- TECH ---------- */
+function techFingerprint(http){
+  const tech=[];
+  const body=http.body||"";
+  const server=http.headers.get("server")||"";
+
+  if(/wp-content|wp-includes/i.test(body)) tech.push("WordPress");
+  if(/Joomla!/i.test(body)) tech.push("Joomla");
+  if(/drupal/i.test(body)) tech.push("Drupal");
+  if(server.includes("nginx")) tech.push("Nginx");
+  if(server.includes("apache")) tech.push("Apache");
+  if(server.includes("cloudflare")) tech.push("Cloudflare");
+
+  return [...new Set(tech)];
 }
 
+/* ---------- HEADERS ---------- */
+function scanHeaders(h){
+  return headersCheck.map(x=>({name:x,ok:h.has(x)}));
+}
+
+/* ---------- DNS ---------- */
+async function scanDNS(domain){
+  const types=["A","AAAA","MX","NS","TXT"];
+  let out={};
+  for(const t of types){
+    try{
+      const r=await fetch(`https://dns.google/resolve?name=${domain}&type=${t}`);
+      const j=await r.json();
+      out[t]=j.Answer?.map(x=>x.data)||[];
+    }catch{ out[t]=[]; }
+  }
+  return out;
+}
+
+/* ---------- SUBDOMAIN (PASSIVE) ---------- */
+async function subdomains(domain){
+  try{
+    const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
+    const j=await r.json();
+    return [...new Set(j.map(x=>x.name_value))].slice(0,20);
+  }catch{return [];}
+}
+
+/* ---------- PORT CHECK ---------- */
+async function scanPorts(domain){
+  let res={};
+  for(const p of ports){
+    try{
+      await timeoutFetch(`http://${domain}:${p}`,3000);
+      res[p]=true;
+    }catch{res[p]=false;}
+  }
+  return res;
+}
+
+/* ---------- RISK ---------- */
+function risk(r){
+  let s=0;
+  if(!r.http.https) s+=20;
+  if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
+  if(r.tech.includes("WordPress")) s+=5;
+  return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
+}
+
+/* ---------- RUN ---------- */
 async function run(){
-  const o=document.getElementById("out");
-  o.textContent="Scanning...\n";
+  const out=document.getElementById("out");
+  out.textContent="Scanning...\n";
+
   const domain=clean(document.getElementById("target").value);
-  if(!domain)return;
+  if(!domain) return;
 
-  let result={target:domain};
+  let r={};
 
   try{
-    const r=await timeoutFetch(PROXY+"http://"+domain);
-    const text=await r.text();
-
-    result.http={
-      status:r.status,
-      redirect:r.url,
-      reachable:r.status<500
-    };
-
-    result.fingerprint=fingerprint(text);
+    r.http=await scanHTTP(domain);
+    r.tech=techFingerprint(r.http);
+    r.headers=scanHeaders(r.http.headers);
+    r.dns=await scanDNS(domain);
+    r.subdomains=await subdomains(domain);
+    r.ports=await scanPorts(domain);
+    r.risk=risk(r);
   }catch(e){
-    result.http={error:"Request blocked or timeout"};
+    out.textContent="Scan failed.";
+    return;
   }
 
-  try{
-    const d=await dns(domain);
-    result.dns=d.Answer?.map(x=>x.data)||[];
-  }catch{
-    result.dns="DNS lookup failed";
-  }
+  let txt="";
+  txt+=section("HTTP",`Status: ${r.http.status}\nHTTPS: ${r.http.https}`);
+  txt+=section("Tech",r.tech.join(", ")||"None");
+  txt+=section("Security Headers",
+    r.headers.map(h=>`${h.name}: ${h.ok?"OK":"MISSING"}`).join("\n")
+  );
+  txt+=section("DNS",
+    Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")}`).join("\n")
+  );
+  txt+=section("Subdomains",r.subdomains.join("\n")||"None");
+  txt+=section("Ports",
+    Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("\n")
+  );
+  txt+=section("Risk",`Level: ${r.risk.level}\nScore: ${r.risk.score}`);
 
-  result.note=[
-    "HTML-only scanner",
-    "No exploitation",
-    "Indicators only"
-  ];
-
-  o.textContent=JSON.stringify(result,null,2);
+  out.textContent=txt;
 }
 </script>
 </body>
