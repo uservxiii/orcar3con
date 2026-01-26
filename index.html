@@ -5,275 +5,232 @@
 <title>ORCA WebScan</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-:root{
-  --bg:#0b1220;
-  --panel:#121a2c;
-  --text:#e9efff;
-  --accent:#4f7cff
-}
-.light{
-  --bg:#f4f6fb;
-  --panel:#ffffff;
-  --text:#0b1220;
-  --accent:#3b6cff
-}
+:root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
 *{box-sizing:border-box}
 body{
-  margin:0;
-  font-family:system-ui;
-  background:var(--bg);
-  color:var(--text);
-  display:flex;
-  height:100vh
+  margin:0;font-family:monospace;
+  background:var(--bg);color:var(--text);
+  height:100vh;display:flex
 }
 .sidebar{
-  width:260px;
-  background:var(--panel);
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:10px
+  width:250px;background:var(--panel);
+  padding:18px;display:flex;flex-direction:column;gap:10px
 }
-.sidebar h2{margin:0}
-.sidebar button{
-  padding:12px;
-  border-radius:12px;
-  border:none;
-  background:var(--accent);
-  color:#fff;
-  cursor:pointer
+button{
+  padding:10px;border-radius:10px;border:none;
+  background:var(--accent);color:#fff;cursor:pointer
 }
-.sidebar .ghost{
-  background:transparent;
-  color:var(--text);
-  border:1px solid var(--accent)
-}
-.main{
-  flex:1;
-  padding:24px;
-  overflow:auto
-}
+.main{flex:1;padding:18px;overflow:auto}
 .card{
   background:var(--panel);
-  border-radius:18px;
-  padding:18px;
-  margin-bottom:16px
+  border-radius:14px;
+  padding:14px;margin-bottom:14px
 }
 input{
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  border:none;
-  margin-bottom:8px
+  width:100%;padding:10px;border-radius:8px;
+  border:none;margin-bottom:6px
 }
 pre{
-  background:#0a1020;
-  color:#cde;
-  padding:16px;
-  border-radius:14px;
+  background:#060b18;
+  padding:14px;border-radius:12px;
   white-space:pre-wrap
 }
-.light pre{background:#eef2ff;color:#111}
-small{opacity:.7}
+.ok{color:#7CFF7C}
+.warn{color:#FFD27C}
+.bad{color:#FF7C7C}
 </style>
 </head>
 
 <body>
 
 <div class="sidebar">
-  <h2>🛡️ ORCA</h2>
-  <button onclick="scan()">Scan Target</button>
-  <button class="ghost" onclick="rceValidate()">RCE Validation</button>
-  <button class="ghost" onclick="toggleTheme()">🌗 Theme</button>
+  <h3>🛡️ ORCA</h3>
+  <button onclick="scan()">scan</button>
+  <button onclick="help()">help</button>
+  <button onclick="clearLog()">clear</button>
 </div>
 
 <div class="main">
-  <h1>ORCA WebScan</h1>
-
   <div class="card">
-    <input id="target" placeholder="https://example.com">
-    <small>Passive scanning · Safe request only</small>
+    <input id="target" placeholder="https://target.com">
+    <small>Passive reconnaissance · CLI style</small>
   </div>
 
   <div class="card">
-    <pre id="out">Idle.</pre>
+    <pre id="out">$ orca ready</pre>
   </div>
 </div>
 
 <script>
-/* ================= LOG ================= */
-const log=[];
-const add=t=>log.push(t);
-const render=()=>out.textContent=log.join("\n");
-const clearLog=()=>log.length=0;
+/* ================= CONFIG ================= */
+const PROXY="proxy.php?url=";
 
-/* ================= UI ================= */
-target.addEventListener("keydown",e=>{
-  if(e.key==="Enter") scan();
-});
-function toggleTheme(){
-  document.body.classList.toggle("light");
+/* ================= CORE ================= */
+const out=document.getElementById("out");
+let log=["$ orca ready"];
+
+const add=t=>{log.push(t);out.textContent=log.join("\n");};
+const clearLog=()=>{log=["$ cleared"];out.textContent=log.join("\n");};
+
+async function fetchProxy(url){
+  try{return await fetch(PROXY+encodeURIComponent(url));}
+  catch{return null;}
 }
 
-/* ================= SAFE FETCH ================= */
-async function fetchSafe(u){
-  try{
-    return await fetch(u,{redirect:"manual"});
-  }catch{
-    return null;
-  }
+/* ================= HELP ================= */
+function help(){
+add(`
+Commands
+--------
+scan     run scan
+clear    clear output
+
+Capabilities
+------------
+- CMS detection
+- WordPress user enumeration
+- Plugin fingerprint (HTML)
+- Online CVE mapping
+`);
 }
 
-/* ================= MAIN SCAN ================= */
+/* ================= SCAN ================= */
 async function scan(){
   clearLog();
   const base=target.value.replace(/\/$/,"");
   if(!base) return;
 
-  add("Scanning target");
-  add("===============");
-  add(base+"\n");
-  render();
+  add("$ scan "+base);
+  add("");
 
-  const home=await fetchSafe(base);
-  if(!home){
-    add("Target unreachable");
-    render();
-    return;
-  }
-
+  const home=await fetchProxy(base);
+  if(!home){add("[-] target unreachable");return;}
   const html=await home.text();
 
-  add("Server / CDN");
-  add("------------");
-  add(home.headers.get("server") || "hidden");
-  if(home.headers.get("cf-ray")) add("Cloudflare detected");
+  const cms=cmsDetect(html);
+  await wpUsers(base,cms);
+  const plugins=pluginFingerprint(html);
+  await cveLookup(cms,plugins);
+
   add("");
-
-  add("WordPress");
-  add("----------");
-  const isWP=/wp-content|wp-includes/i.test(html);
-  add(isWP ? "YES" : "NO");
-  add("");
-
-  if(isWP){
-    await enumUsers(base);
-    await pluginScan(base);
-  }
-
-  add("\nScan completed.");
-  render();
+  add("[+] scan completed");
 }
 
-/* ================= USER ENUM ================= */
-async function enumUsers(base){
-  add("User Enumeration");
-  add("-----------------");
+/* ================= CMS DETECT ================= */
+function cmsDetect(html){
+  add("[*] CMS detection");
+  if(/wp-content|wp-includes/i.test(html)){
+    add("    CMS : WordPress");
+    return "wordpress";
+  }
+  if(/Joomla!|\/components\//i.test(html)){
+    add("    CMS : Joomla");
+    return "joomla";
+  }
+  if(/Drupal|\/sites\/default\//i.test(html)){
+    add("    CMS : Drupal");
+    return "drupal";
+  }
+  if(/laravel|csrf-token/i.test(html)){
+    add("    CMS : Laravel");
+    return "laravel";
+  }
+  add("    CMS : Unknown");
+  return "unknown";
+}
 
-  let users=new Set();
+/* ================= WP USERS ================= */
+async function wpUsers(base,cms){
+  if(cms!=="wordpress") return;
 
-  const api=await fetchSafe(base+"/wp-json/wp/v2/users");
-  if(api){
-    if(api.status===200){
-      add("REST API : EXPOSED (CORS may block browser access)");
-    }else if(api.status===401 || api.status===403){
-      add("REST API : PROTECTED");
-    }else{
-      add("REST API : UNKNOWN ("+api.status+")");
-    }
-  }else{
-    add("REST API : BLOCKED");
+  add("");
+  add("[*] WordPress users");
+
+  const api=await fetchProxy(base+"/wp-json/wp/v2/users");
+  let found=false;
+
+  if(api && api.status===200){
+    try{
+      const j=await api.json();
+      j.forEach(u=>{
+        add("    user : "+u.slug+" (REST)");
+        found=true;
+      });
+    }catch{}
   }
 
   for(let i=1;i<=10;i++){
-    const r=await fetchSafe(base+"/?author="+i);
+    const r=await fetchProxy(base+"/?author="+i);
     if(r && r.url){
       const m=r.url.match(/\/author\/([^\/]+)/);
-      if(m) users.add(m[1]);
+      if(m){
+        add("    user : "+m[1]+" (author)");
+        found=true;
+      }
     }
   }
 
-  if(users.size){
-    users.forEach(u=>add("User: "+u));
-  }else{
-    add("No users discovered via author enumeration");
-  }
-
-  add("");
+  if(!found) add("    no users discovered");
 }
 
-/* ================= PLUGIN SCAN ================= */
-async function pluginScan(base){
-  add("Plugin Detection");
-  add("----------------");
+/* ================= PLUGIN FINGERPRINT ================= */
+function pluginFingerprint(html){
+  add("");
+  add("[*] Plugin fingerprint");
 
   const plugins=[
-    {n:"revslider",p:"/wp-content/plugins/revslider/",c:"CVE-2014-9734",r:"HIGH"},
-    {n:"wp-file-manager",p:"/wp-content/plugins/wp-file-manager/",c:"CVE-2020-25213",r:"HIGH"},
-    {n:"elementor",p:"/wp-content/plugins/elementor/",c:"CVE-2023-48777",r:"MEDIUM"}
+    {name:"elementor",re:/elementor/i},
+    {name:"revslider",re:/revslider/i},
+    {name:"wp-file-manager",re:/wp-file-manager/i},
+    {name:"woocommerce",re:/woocommerce/i}
   ];
 
-  let found=false;
+  const detected=[];
+  plugins.forEach(p=>{
+    if(p.re.test(html)){
+      detected.push(p.name);
+      add("    "+p.name+" detected");
+    }
+  });
 
-  for(const x of plugins){
-    const r=await fetchSafe(base+x.p);
-    if(!r) continue;
-
-    found=true;
-    add("Plugin : "+x.n);
-    add("Path   : "+x.p);
-    add("Risk   : "+x.r);
-    add("CVE    : "+x.c);
-    add("");
-  }
-
-  if(!found) add("No known vulnerable plugin detected\n");
+  if(!detected.length) add("    no known plugin detected");
+  return detected;
 }
 
-/* ================= RCE VALIDATION ================= */
-async function rceValidate(){
-  const base=target.value.replace(/\/$/,"");
-  if(!base) return;
+/* ================= CVE ONLINE LOOKUP ================= */
+async function cveLookup(cms,plugins){
+  add("");
+  add("[*] CVE mapping");
 
-  add("\nRCE Validation");
-  add("--------------");
+  if(!plugins.length){
+    add("    nothing to map");
+    return;
+  }
 
-  const tests=[
-    "/?cmd=id",
-    "/?exec=whoami",
-    "/wp-admin/admin-ajax.php?action=test"
-  ];
+  for(const p of plugins){
+    add("    searching CVE for "+p+" ...");
 
-  let score=0;
+    const api=`https://cve.circl.lu/api/search/${cms}/${p}`;
+    const r=await fetchProxy(api);
 
-  for(const t of tests){
-    const r=await fetchSafe(base+t);
-    if(!r){
-      add(t+" → blocked");
+    if(!r || r.status!==200){
+      add("      CVE lookup failed");
       continue;
     }
 
-    const txt=await r.text();
-    if(/uid=|gid=|root:/i.test(txt)){
-      add(t+" → EXEC STRING DETECTED");
-      score+=3;
-    }else if(/warning|fatal error/i.test(txt)){
-      add(t+" → ERROR LEAK");
-      score+=2;
-    }else{
-      add(t+" → OK");
+    try{
+      const j=await r.json();
+      if(j.data && j.data.length){
+        j.data.slice(0,3).forEach(c=>{
+          add(`      ${c.id} | ${c.cvss || "N/A"} | ${c.summary}`);
+        });
+      }else{
+        add("      no CVE found");
+      }
+    }catch{
+      add("      parse error");
     }
   }
-
-  add("\nResult");
-  add("------");
-  add(
-    score>=5 ? "LIKELY VULNERABLE (HIGH)" :
-    score>=2 ? "POTENTIAL (MEDIUM)" :
-    "No RCE indication (LOW)"
-  );
-  add("Safe validation – no payload executed");
-  render();
 }
 </script>
 
