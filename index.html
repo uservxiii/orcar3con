@@ -7,21 +7,103 @@
 
 <style>
 :root{
-  --navy:#0b1d3a;--bg:#f4f6fb;--card:#fff;--border:#e0e6f2;
+  --navy:#0b1d3a;
+  --white:#fff;
+  --gray:#f4f6fb;
+  --border:#e0e6f2;
+  --ok:#0a6;
+  --warn:#a80;
+  --err:#a00;
+  --shadow:0 8px 24px rgba(0,0,0,.08)
 }
-body{margin:0;font-family:system-ui;background:var(--bg)}
+[data-theme="dark"]{
+  --navy:#e9efff;
+  --white:#0b1220;
+  --gray:#0a1020;
+  --border:#1b2436;
+  --shadow:0 10px 26px rgba(0,0,0,.4)
+}
+body{
+  margin:0;
+  font-family:system-ui;
+  background:linear-gradient(180deg,#f7f9ff,#f4f6fb)
+}
+[data-theme="dark"] body{
+  background:linear-gradient(180deg,#0a0f1f,#0a1020)
+}
 .container{max-width:1100px;margin:auto;padding:20px}
-.card{background:var(--card);border-radius:18px;padding:20px;border:1px solid var(--border)}
-.row{display:flex;gap:10px}
-input,textarea,select,button{
-  padding:12px;border-radius:12px;border:1px solid var(--border);width:100%;
+.card{
+  background:var(--white);
+  border-radius:18px;
+  padding:20px;
+  border:1px solid var(--border);
+  box-shadow:var(--shadow)
 }
-button{background:var(--navy);color:#fff;cursor:pointer}
-.section{margin-top:15px;padding:15px;border:1px solid var(--border);border-radius:14px}
-.progress{height:10px;background:#ddd;border-radius:6px;overflow:hidden}
-.progress div{height:100%;width:0;background:var(--navy)}
-pre{background:#eee;padding:12px;border-radius:10px;white-space:pre-wrap}
-.hidden{display:none}
+h1{text-align:center;color:var(--navy);margin:0 0 14px}
+.row{display:flex;gap:12px;align-items:center}
+input,button,textarea,select{
+  padding:12px;
+  font-size:16px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  width:100%;
+  box-sizing:border-box;
+  background:var(--white);
+  color:var(--navy)
+}
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select{
+  background:#121a2c;
+  color:#e9efff
+}
+button{
+  background:var(--navy);
+  color:#fff;
+  cursor:pointer
+}
+pre{
+  background:#f7f9ff;
+  padding:15px;
+  border-radius:12px;
+  white-space:pre-wrap;
+  overflow:auto
+}
+[data-theme="dark"] pre{
+  background:#0f172a;
+  color:#e9efff
+}
+.badge{
+  padding:4px 8px;
+  border-radius:8px;
+  font-size:12px
+}
+.ok{background:#d4f8e8;color:#0a6}
+.warn{background:#fff4cc;color:#a80}
+.err{background:#ffd6d6;color:#a00}
+.section{
+  border:1px solid var(--border);
+  padding:14px;
+  border-radius:14px;
+  background:var(--white)
+}
+[data-theme="dark"] .section{
+  background:#0f172a;
+  border-color:#1b2436
+}
+.progress{
+  height:10px;
+  background:#e9edf7;
+  border-radius:8px;
+  overflow:hidden;
+  margin:10px 0
+}
+.progress>div{
+  height:100%;
+  width:0;
+  background:var(--navy)
+}
+.small{font-size:13px;color:#666}
 </style>
 </head>
 
@@ -30,60 +112,159 @@ pre{background:#eee;padding:12px;border-radius:10px;white-space:pre-wrap}
 <h1>ORCA WebScan</h1>
 
 <div class="card">
+<p class="small">Only scan targets you own or have permission.</p>
 
-  <div class="row">
-    <input id="target" placeholder="example.com">
-    <button onclick="run()">Scan</button>
-    <button onclick="toggleTheme()">Theme</button>
-  </div>
+<div class="row">
+<input id="target" placeholder="domain.com" autofocus>
+<button onclick="run()">Scan</button>
+<button onclick="toggleTheme()">Theme</button>
+</div>
 
-  <div class="progress"><div id="bar"></div></div>
+<div class="progress"><div id="bar"></div></div>
 
-  <div class="section">
-    <h2>Results</h2>
-    <div id="output">No scan yet.</div>
-  </div>
+<div id="output" class="section"></div>
+<div id="details" class="section"></div>
 
-  <div class="section">
-    <h2>Details</h2>
-    <pre id="details">-</pre>
-  </div>
+<h2>LAB</h2>
+<input id="labEndpoint" placeholder="/search?q=">
+<select id="labMethod"><option>GET</option><option>POST</option></select>
+<textarea id="labPayload" placeholder="payload"></textarea>
+<div class="row">
+<button onclick="labTest()">Run</button>
+<button onclick="validateXSSReflected()">XSS</button>
+<button onclick="validateSQLiTimeBased()">SQLi</button>
+<button onclick="validateRCE()">RCE</button>
+</div>
+<pre id="labOut"></pre>
 
-  <div class="section">
-    <button onclick="toggleLab()">Toggle LAB Mode</button>
-  </div>
+<h2>Bruteforce</h2>
+<input type="file" id="adminWordlistFile">
+<input type="file" id="dirWordlistFile">
+<input type="file" id="subWordlistFile">
 
-  <!-- LAB MODE -->
-  <div id="lab" class="section hidden">
-    <h2>LAB Mode</h2>
+<div class="row">
+<button onclick="adminBrute()">Admin</button>
+<button onclick="dirBrute()">Dir</button>
+<button onclick="subdomainBrute()">Sub</button>
+</div>
 
-    <input id="labEndpoint" placeholder="/search?q=">
-    <select id="labMethod">
-      <option>GET</option>
-      <option>POST</option>
-    </select>
-    <textarea id="labPayload" placeholder="payload"></textarea>
+<pre id="adminOut"></pre>
+<pre id="dirOut"></pre>
+<pre id="subOut"></pre>
 
-    <div class="row">
-      <button onclick="labTest()">Send</button>
-    </div>
-
-    <pre id="labOut">Lab output…</pre>
-  </div>
-
-  <div class="section">
-    <button onclick="exportReport()">Export JSON</button>
-    <button onclick="clearHistory()">Clear History</button>
-  </div>
-
-  <div class="section">
-    <h2>History</h2>
-    <pre id="historyOut">No history</pre>
-  </div>
-
+<h2>History</h2>
+<button onclick="clearHistory()">Clear</button>
+<pre id="historyOut"></pre>
 </div>
 </div>
 
-<script src="script.js"></script>
+<script>
+const PROXY="https://r.jina.ai/http://";
+const ports=[80,443,8080,8443];
+const headersCheck=["content-security-policy","strict-transport-security","x-frame-options","x-content-type-options","referrer-policy","permissions-policy"];
+
+let lastReport=null;
+let bruteState={
+ admin:{running:false,index:0,list:[],found:[],delay:200},
+ sub:{running:false,index:0,list:[],found:[],delay:200},
+ dir:{running:false,index:0,list:[],found:[],delay:200}
+};
+
+const clean=d=>d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,'');
+const setProgress=p=>document.getElementById("bar").style.width=p+"%";
+const badge=(t,c)=>`<span class="badge ${c}">${t}</span>`;
+const section=(t,h)=>`<h2>${t}</h2>${h}`;
+
+async function timeoutFetch(u,m=8000){
+ const c=new AbortController();
+ setTimeout(()=>c.abort(),m);
+ return fetch(u,{signal:c.signal});
+}
+
+function toggleTheme(){
+ const r=document.documentElement;
+ r.setAttribute("data-theme",r.getAttribute("data-theme")==="dark"?"light":"dark");
+}
+
+function saveHistory(r){
+ const h=JSON.parse(localStorage.getItem("orca_history")||"[]");
+ h.unshift({time:new Date().toISOString(),report:r});
+ localStorage.setItem("orca_history",JSON.stringify(h.slice(0,20)));
+ renderHistory();
+}
+
+function renderHistory(){
+ const h=JSON.parse(localStorage.getItem("orca_history")||"[]");
+ document.getElementById("historyOut").textContent=h.length?
+ h.map(x=>x.time+"\n"+JSON.stringify(x.report,null,2)).join("\n\n"):
+ "No history";
+}
+
+function clearHistory(){
+ localStorage.removeItem("orca_history");
+ renderHistory();
+}
+
+async function scanHTTP(d){
+ const r=await timeoutFetch(PROXY+"http://"+d);
+ const t=await r.text();
+ let h={};
+ r.headers.forEach((v,k)=>h[k]=v);
+ return {status:r.status,url:r.url,headers:h,body:t,https:r.url.startsWith("https")};
+}
+
+function scanHeaders(h){
+ return headersCheck.map(x=>({name:x,ok:!!h[x]}));
+}
+
+async function scanDNS(d){
+ const t=["A","AAAA","MX","NS","TXT"];
+ let o={};
+ for(const x of t){
+  try{
+   const r=await fetch(`https://dns.google/resolve?name=${d}&type=${x}`);
+   const j=await r.json();
+   o[x]=j.Answer?.map(a=>a.data)||[];
+  }catch{o[x]=[]}
+ }
+ return o;
+}
+
+async function scanPorts(d){
+ let r={};
+ for(const p of ports){
+  try{await timeoutFetch(`http://${d}:${p}`,3000);r[p]=true}catch{r[p]=false}
+ }
+ return r;
+}
+
+async function run(){
+ const d=clean(target.value);
+ if(!d) return;
+ setProgress(5);
+ output.innerHTML="Scanning...";
+ try{
+  const r={};
+  r.http=await scanHTTP(d);setProgress(20);
+  r.headers=scanHeaders(r.http.headers);setProgress(40);
+  r.dns=await scanDNS(d);setProgress(60);
+  r.ports=await scanPorts(d);setProgress(80);
+  lastReport=r;saveHistory(r);setProgress(100);
+
+  output.innerHTML=
+   section("HTTP",`Status: ${r.http.status}`)+
+   section("Headers",r.headers.map(x=>`${x.name}: ${x.ok?"OK":"MISS"}`).join("<br>"));
+
+  details.innerHTML=
+   section("DNS",Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")}`).join("<br>"))+
+   section("Ports",Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"));
+ }catch{
+  output.innerHTML="Scan failed";
+  setProgress(0);
+ }
+}
+
+document.addEventListener("DOMContentLoaded",renderHistory);
+</script>
 </body>
 </html>
