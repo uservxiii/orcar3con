@@ -1,364 +1,287 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan (Stable + WP Admin Detect)</title>
+<title>ORCA WebScan (Stable)</title>
 <style>
-  :root{
-    --navy:#0b1d3a;
-    --white:#ffffff;
-    --gray:#f0f2f6;
-    --gray2:#d9dde6;
-    --text:#1f2a3a;
-    --shadow: 0 10px 30px rgba(0,0,0,0.08);
-    --ok:#0a6;
-    --warn:#a80;
-    --err:#a00;
-  }
-  [data-theme="dark"]{
-    --navy:#1b2a4a;
-    --white:#0b1220;
-    --gray:#0a1020;
-    --gray2:#1b2436;
-    --text:#e9efff;
-    --shadow: 0 10px 30px rgba(0,0,0,0.4);
-  }
-  body{
-    margin:0;
-    font-family:system-ui;
-    background: linear-gradient(180deg, var(--gray) 0%, #e9edf5 100%);
-    color:var(--text);
-  }
-  [data-theme="dark"] body{
-    background: linear-gradient(180deg, #0a0f1f 0%, #0a1020 100%);
-  }
-  .app{
-    display:flex;
-    height:100vh;
-    overflow:hidden;
-  }
-  .sidebar{
-    width:300px;
-    background:var(--gray);
-    border-right:1px solid var(--gray2);
-    box-shadow: var(--shadow);
-    padding:22px;
-    box-sizing:border-box;
-  }
-  [data-theme="dark"] .sidebar{
-    background: #0f172a;
-    border-color: var(--gray2);
-  }
-  .sidebar h1{
-    font-size:22px;
-    margin:0 0 10px 0;
-    color:var(--navy);
-  }
-  .sidebar .small{
-    font-size:13px;
-    color:#666;
-    margin:0 0 14px 0;
-  }
-  .sidebar button{
-    width:100%;
-    padding:12px;
-    border-radius:12px;
-    border:1px solid var(--gray2);
-    background:var(--navy);
-    color:#fff;
-    cursor:pointer;
-    margin-bottom:10px;
-    font-weight:600;
-  }
-  .sidebar button:hover{ transform:translateY(-1px); }
-  .sidebar button:active{ transform:translateY(0); }
-  .sidebar .btn-secondary{
-    background:#fff;
-    color:var(--navy);
-  }
-  .sidebar .btn-secondary:hover{
-    background:#f4f6fb;
-  }
-  .main{
-    flex:1;
-    overflow:auto;
-    padding:20px;
-    box-sizing:border-box;
-  }
-  .tabs{
-    display:flex;
-    gap:10px;
-    margin-bottom:14px;
-  }
-  .tab{
-    padding:10px 14px;
-    border-radius:12px;
-    border:1px solid var(--gray2);
-    background:var(--gray);
-    cursor:pointer;
-    font-weight:600;
-  }
-  .tab.active{
-    background:var(--navy);
-    color:#fff;
-    border-color:var(--navy);
-  }
-  .card{
-    background:var(--white);
-    border-radius:18px;
-    padding:20px;
-    border:1px solid var(--gray2);
-    box-shadow: var(--shadow);
-  }
-  [data-theme="dark"] .card{
-    background:#0f172a;
-    border-color:var(--gray2);
-  }
-  input,button,textarea,select{
-    padding:12px;
-    font-size:16px;
-    border-radius:12px;
-    border:1px solid var(--gray2);
-    width:100%;
-    box-sizing:border-box;
-    background:var(--white);
-    color:var(--text);
-  }
-  [data-theme="dark"] input,[data-theme="dark"] textarea,[data-theme="dark"] select{
-    background:#121a2c;
-    color:#e9efff;
-  }
-  .row{
-    display:flex;
-    gap:12px;
-    align-items:center;
-  }
-  .row > *{ flex:1; }
-  .badge{
-    display:inline-block;
-    padding:4px 8px;
-    border-radius:8px;
-    font-size:12px;
-    margin-left:6px;
-  }
-  .ok{ background:#d4f8e8; color:var(--ok); }
-  .warn{ background:#fff4cc; color:var(--warn); }
-  .err{ background:#ffd6d6; color:var(--err); }
-  pre{
-    background:#f7f9ff;
-    padding:15px;
-    border-radius:12px;
-    overflow:auto;
-    white-space:pre-wrap;
-    color:var(--text);
-  }
-  [data-theme="dark"] pre{
-    background:#0f172a;
-    color:#e9efff;
-  }
-  .progress{
-    height:10px;
-    background:#e9edf7;
-    border-radius:8px;
-    overflow:hidden;
-    margin:10px 0 14px 0;
-  }
-  .progress > div{
-    height:100%;
-    width:0;
-    background:var(--navy);
-    transition: width .2s ease;
-  }
+:root{
+  --navy:#0b1d3a;
+  --navy2:#0f2a4a;
+  --white:#f7f8fb;
+  --gray:#e6e9f2;
+  --text:#0b1220;
+  --border:#2a3a55;
+  --ok:#0a6;
+  --warn:#a80;
+  --err:#a00;
+  --shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+[data-theme="dark"]{
+  --navy:#e9efff;
+  --navy2:#a9c2ff;
+  --white:#0b1220;
+  --gray:#0a1020;
+  --text:#e9efff;
+  --border:#1b2436;
+  --shadow: 0 10px 26px rgba(0,0,0,0.4);
+}
+body{
+  margin:0;
+  font-family: system-ui, sans-serif;
+  background: linear-gradient(180deg, #f2f4ff 0%, #e8ecff 100%);
+}
+[data-theme="dark"] body{
+  background: linear-gradient(180deg, #070a14 0%, #0a1020 100%);
+}
+.container{
+  max-width: 1200px;
+  margin:auto;
+  padding:20px;
+}
+.sidebar{
+  width: 260px;
+  border-right:1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border-radius: 18px;
+}
+.main{
+  flex:1;
+  padding: 16px;
+}
+.layout{
+  display:flex;
+  gap:16px;
+}
+.brand{
+  font-weight:800;
+  color: var(--navy);
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+[data-theme="dark"] .brand{ color: var(--navy); }
+.navbtn{
+  width:100%;
+  padding:12px 10px;
+  margin:6px 0;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  cursor:pointer;
+  text-align:left;
+  font-weight:600;
+}
+.navbtn.active{
+  background: linear-gradient(90deg, var(--navy2), var(--navy));
+  color:#fff;
+}
+.card{
+  background: var(--white);
+  border-radius: 18px;
+  padding: 18px;
+  border:1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+h1{ margin:0 0 8px 0; color:var(--navy); }
+[data-theme="dark"] h1{ color: var(--navy); }
+.small{ color: #7a7f9a; font-size: 13px; }
+input,button,textarea,select{
+  padding:12px;
+  font-size:16px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  width:100%;
+  box-sizing:border-box;
+  background: var(--white);
+  color: var(--text);
+}
+[data-theme="dark"] input, textarea, select{
+  background:#121a2c;
+  color:#e9efff;
+}
+button{
+  background: var(--navy);
+  color:#fff;
+  cursor:pointer;
+}
+button:hover{ opacity:0.95; }
+.row{ display:flex; gap:12px; }
+.row > *{ flex:1; }
+.pre{
+  background:#f7f9ff;
+  padding:14px;
+  border-radius:12px;
+  overflow:auto;
+  white-space:pre-wrap;
+  color: var(--text);
+}
+[data-theme="dark"] .pre{
+  background:#0f172a;
+  color:#e9efff;
+}
+.badge{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:8px;
+  font-size:12px;
+  margin-left:6px;
+}
+.ok{ background:#d4f8e8; color:var(--ok); }
+.warn{ background:#fff4cc; color:var(--warn); }
+.err{ background:#ffd6d6; color:var(--err); }
+.progress{
+  height:10px;
+  background:#e9edf7;
+  border-radius:8px;
+  overflow:hidden;
+  margin:10px 0 14px 0;
+}
+.progress > div{
+  height:100%;
+  width:0;
+  background:var(--navy);
+}
+.footer{
+  margin-top:14px;
+  font-size:13px;
+  color:#666;
+  text-align:center;
+}
+[data-theme="dark"] .footer{ color:#b8c3d7; }
+.kbd{
+  display:inline-block;
+  padding:2px 6px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#f0f2ff;
+  font-size:12px;
+}
+[data-theme="dark"] .kbd{ background:#1b2436; }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="sidebar">
-    <h1>ORCA WebScan</h1>
-    <p class="small">⚠️ Only scan targets you own or have permission to test.</p>
-    <button id="btnScan">Start Scan</button>
-    <button id="btnExport" class="btn-secondary">Export Report</button>
-    <button id="btnHistory" class="btn-secondary">Show History</button>
-    <button id="btnTheme" class="btn-secondary">Toggle Theme</button>
-    <hr>
-    <div class="small">Target:</div>
-    <input id="target" placeholder="example.com" />
-    <div class="progress"><div id="bar"></div></div>
-    <div class="small">Status:</div>
-    <pre id="status">Idle</pre>
-  </div>
-
-  <div class="main">
-    <div class="tabs">
-      <div class="tab active" data-tab="scan">Scan</div>
-      <div class="tab" data-tab="lab">Lab</div>
-      <div class="tab" data-tab="admin">Admin</div>
-      <div class="tab" data-tab="history">History</div>
-    </div>
-
-    <div id="tab-scan" class="card tab-content">
-      <h2>Scan</h2>
-      <div class="row">
-        <input id="scanTarget" placeholder="domain.com" />
-        <button id="scanBtn">Scan</button>
-      </div>
-      <div id="scanOut" style="margin-top:12px;">
-        <pre>No scan yet.</pre>
+<div class="container">
+  <div class="layout">
+    <div class="sidebar">
+      <div class="brand">ORCA WebScan</div>
+      <button class="navbtn active" data-tab="scan">Scan</button>
+      <button class="navbtn" data-tab="lab">Lab</button>
+      <button class="navbtn" data-tab="history">History</button>
+      <hr>
+      <button class="navbtn" id="themeBtn">Toggle Theme</button>
+      <div class="small" style="margin-top:10px;">
+        ⚠️ Only scan targets you own or have permission.
       </div>
     </div>
 
-    <div id="tab-lab" class="card tab-content" style="display:none;">
-      <h2>Lab</h2>
-      <div class="row">
-        <input id="labEndpoint" placeholder="/path?param=" />
-        <select id="labMethod">
-          <option value="GET">GET</option>
-          <option value="POST">POST</option>
-        </select>
+    <div class="main">
+      <div id="tab-scan" class="card tab">
+        <h1>Scan</h1>
+        <div class="row">
+          <input id="target" placeholder="example.com" autofocus>
+          <button id="scanBtn">Start</button>
+        </div>
+        <div class="progress"><div id="bar"></div></div>
+        <div id="status" class="small">Status: idle</div>
+        <hr>
+        <div id="output" class="pre">Results will appear here...</div>
+        <div class="row" style="margin-top:12px;">
+          <button id="exportBtn">Export JSON</button>
+          <button id="clearHistoryBtn">Clear History</button>
+        </div>
       </div>
-      <div style="margin-top:12px;">
-        <textarea id="labPayload" rows="4" placeholder="payload"></textarea>
-      </div>
-      <div class="row" style="margin-top:12px;">
-        <button id="labRun">Run</button>
-        <button id="labValidate">Validate</button>
-      </div>
-      <div id="labOut" style="margin-top:12px;">
-        <pre>No lab test yet.</pre>
-      </div>
-    </div>
 
-    <div id="tab-admin" class="card tab-content" style="display:none;">
-      <h2>Admin Login Detect (WP + Generic)</h2>
-      <div class="row">
-        <input id="adminTarget" placeholder="domain.com" />
-        <button id="adminBtn">Detect</button>
+      <div id="tab-lab" class="card tab" style="display:none;">
+        <h1>Lab</h1>
+        <div class="row">
+          <input id="labEndpoint" placeholder="/?q=test">
+          <select id="labMethod">
+            <option>GET</option>
+            <option>POST</option>
+          </select>
+          <button id="labBtn">Send</button>
+        </div>
+        <textarea id="labPayload" placeholder="payload (optional)" style="margin-top:12px;" rows="4"></textarea>
+        <div id="labOut" class="pre" style="margin-top:12px;">Lab output...</div>
       </div>
-      <div id="adminOut" style="margin-top:12px;">
-        <pre>No admin scan yet.</pre>
-      </div>
-    </div>
 
-    <div id="tab-history" class="card tab-content" style="display:none;">
-      <h2>History</h2>
-      <div id="historyOut">
-        <pre>No history yet.</pre>
+      <div id="tab-history" class="card tab" style="display:none;">
+        <h1>History</h1>
+        <div id="historyOut" class="pre">No history yet.</div>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-const PROXY = "https://r.jina.ai/http://";
-
+const PROXY_BASE = "https://r.jina.ai/http://"; // correct proxy
+const headersCheck = ["content-security-policy","strict-transport-security","x-frame-options","x-content-type-options","referrer-policy","permissions-policy"];
 let lastReport = null;
 
-// updated admin paths (WP + common)
-const adminPaths = [
-  "/wp-login.php",
-  "/wp-admin/",
-  "/wp-admin/admin-ajax.php",
-  "/wp-admin/setup-config.php",
-  "/wp-admin/install.php",
-  "/xmlrpc.php",
-  "/wp-json/",
-  "/wp-content/",
-  "/admin",
-  "/administrator",
-  "/login",
-  "/admin/login",
-  "/adminpanel",
-  "/cpanel",
-  "/user/login"
-];
-
-// helpers
-function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
 function setProgress(p){ document.getElementById("bar").style.width = p + "%"; }
-function setStatus(txt){ document.getElementById("status").textContent = txt; }
 function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
-function section(title, html){ return `<h3>${title}</h3>${html}`; }
-async function timeoutFetch(url, ms=8000){
+
+function cleanDomain(d){
+  d = d.trim().toLowerCase();
+  d = d.replace(/^https?:\/\//, "");
+  d = d.replace(/^www\./, "");
+  d = d.split("/")[0];
+  return d;
+}
+
+async function timeoutFetch(url,ms=8000){
   const c = new AbortController();
   setTimeout(()=>c.abort(), ms);
   return fetch(url, {signal:c.signal});
 }
-function saveHistory(report){
-  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  h.unshift({time:new Date().toISOString(), report});
-  localStorage.setItem("orca_history", JSON.stringify(h.slice(0, 20)));
-  renderHistory();
-}
-function renderHistory(){
-  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
-  const out = document.getElementById("historyOut");
-  if(!h.length){
-    out.innerHTML = "<pre>No history yet.</pre>";
-    return;
-  }
-  out.innerHTML = "<pre>" + h.map(x=>`${x.time}\n${JSON.stringify(x.report, null, 2)}`).join("\n\n") + "</pre>";
-}
-function exportReport(){
-  if(!lastReport){ alert("No report to export yet."); return; }
-  const blob = new Blob([JSON.stringify(lastReport, null, 2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "orca_report.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
-// scan
 async function scanHTTP(domain){
-  const r = await timeoutFetch(PROXY + "http://" + domain);
+  const r = await timeoutFetch(PROXY_BASE + domain, 8000);
   const text = await r.text();
   let headersObj = {};
   r.headers.forEach((v,k)=> headersObj[k]=v);
   return {status:r.status, url:r.url, headers:headersObj, body:text, https:r.url.startsWith("https")};
 }
+
 function scanHeaders(h){
-  const headersCheck=[
-    "content-security-policy",
-    "strict-transport-security",
-    "x-frame-options",
-    "x-content-type-options",
-    "referrer-policy",
-    "permissions-policy"
+  return headersCheck.map(x=>({name:x, ok:!!h[x]}));
+}
+
+function techFingerprint(http){
+  const tech=[];
+  const body=http.body||"";
+  const server=http.headers["server"]||"";
+  const patterns = [
+    ["WordPress", /wp-content|wp-includes/i],
+    ["Joomla", /Joomla!/i],
+    ["Drupal", /drupal/i],
+    ["Magento", /Magento/i],
+    ["Shopify", /shopify/i],
+    ["Laravel", /laravel/i],
+    ["Express", /express/i],
+    ["Django", /django/i],
+    ["Next.js", /next\.js/i],
+    ["React", /react/i],
+    ["Angular", /angular/i]
   ];
-  return headersCheck.map(x=>({name:x,ok:!!h[x]}));
+  patterns.forEach(p=>{
+    if(p[1].test(body) || server.toLowerCase().includes(p[0].toLowerCase())){
+      tech.push(p[0]);
+    }
+  });
+  return [...new Set(tech)];
 }
-async function scanDNS(domain){
-  const types=["A","AAAA","MX","NS","TXT"];
-  let out={};
-  for(const t of types){
-    try{
-      const r=await fetch(`https://dns.google/resolve?name=${domain}&type=${t}`);
-      const j=await r.json();
-      out[t]=j.Answer?.map(x=>x.data)||[];
-    }catch{ out[t]=[]; }
-  }
-  return out;
-}
-async function scanPorts(domain){
-  const ports = [80, 443, 8080, 8443];
-  let res={};
-  for(const p of ports){
-    try{
-      await timeoutFetch(`http://${domain}:${p}`,3000);
-      res[p]=true;
-    }catch{res[p]=false;}
-  }
-  return res;
-}
+
 function detectWAF(headers, body){
   const waf=[];
   const h=k=> (headers[k]||"").toLowerCase();
   const b=(body||"").toLowerCase();
   if(h("server").includes("cloudflare")||h("cf-ray")) waf.push("Cloudflare");
   if(h("x-sucuri-id")||b.includes("sucuri firewall")) waf.push("Sucuri");
-  if(h("x-akamai-transformed")||h("akamai-ghost")) waf.push("Akamai");
+  if(h("x-akamai-transformed")||b.includes("akamai-ghost")) waf.push("Akamai");
   if(h("x-incapsula")||b.includes("incapsula")) waf.push("Imperva");
   if(h("x-waf")||h("x-firewall")) waf.push("Generic WAF");
   let level="None";
@@ -367,171 +290,181 @@ function detectWAF(headers, body){
   }
   return {vendors:[...new Set(waf)], level};
 }
+
+function detectCMSVersion(body){
+  const v=[];
+  const wp = body.match(/wp-content\/themes\/[^\/]+\/style\.css.*?Version:\s*([0-9.]+)/i);
+  if(wp) v.push(`WordPress: ${wp[1]}`);
+  return v;
+}
+
+const adminPaths = [
+  "/wp-login.php","/wp-admin/","/wp-admin/admin-ajax.php","/wp-admin/setup-config.php","/wp-admin/install.php",
+  "/xmlrpc.php","/wp-json/","/wp-content/","/admin","/administrator","/login","/admin/login","/adminpanel",
+  "/cpanel","/user/login"
+];
+
+async function detectAdmin(domain){
+  const found=[];
+  for(const p of adminPaths){
+    try{
+      const r = await timeoutFetch(PROXY_BASE + domain + p, 5000);
+      if(r.status===200){
+        const t = await r.text();
+        if(t.toLowerCase().includes("login") || t.toLowerCase().includes("wp-login") || t.toLowerCase().includes("password")){
+          found.push(p + " => 200");
+        }
+      } else {
+        found.push(p + " => " + r.status);
+      }
+    }catch(e){
+      found.push(p + " => failed");
+    }
+  }
+  return found;
+}
+
 function risk(r){
   let s=0;
   if(!r.http.https) s+=20;
   if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
+  if(r.tech.includes("WordPress")) s+=5;
   if(r.waf.level==="High") s+=10;
-  return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
+  return {score:s, level:s<20?"Low":s<40?"Medium":"High"};
 }
 
-// run scan
-async function runScan(domain){
-  setStatus("Scanning...");
-  setProgress(5);
+function saveHistory(report){
+  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
+  h.unshift({time:new Date().toISOString(), report});
+  localStorage.setItem("orca_history", JSON.stringify(h.slice(0, 20)));
+  renderHistory();
+}
+function renderHistory(){
+  const h = JSON.parse(localStorage.getItem("orca_history")||"[]");
+  if(!h.length){
+    document.getElementById("historyOut").textContent="No history yet.";
+    return;
+  }
+  document.getElementById("historyOut").textContent = h.map(x=>`${x.time}\n${JSON.stringify(x.report,null,2)}`).join("\n\n");
+}
+function clearHistory(){
+  localStorage.removeItem("orca_history");
+  renderHistory();
+}
+
+async function runScan(){
+  const target = cleanDomain(document.getElementById("target").value);
+  if(!target) return;
+  document.getElementById("status").textContent="Status: scanning...";
+  setProgress(10);
+
   try{
     const r = {};
-    r.http = await scanHTTP(domain);
-    setProgress(30);
+    r.http = await scanHTTP(target);
+    setProgress(35);
+
+    r.tech = techFingerprint(r.http);
     r.headers = scanHeaders(r.http.headers);
-    setProgress(45);
-    r.dns = await scanDNS(domain);
-    setProgress(60);
-    r.ports = await scanPorts(domain);
-    setProgress(80);
     r.waf = detectWAF(r.http.headers, r.http.body);
+    r.version = detectCMSVersion(r.http.body);
+    setProgress(55);
+
+    r.admin = await detectAdmin(target);
+    setProgress(80);
+
     r.risk = risk(r);
     setProgress(100);
 
     lastReport = r;
     saveHistory(r);
 
-    const out = `
-${section("HTTP", `
-Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}
+    document.getElementById("output").innerHTML =
+      `HTTP Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}
 HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
-`)}
-${section("Security Headers", r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
-${section("WAF", `Detected: ${r.waf.vendors.join(", ")||"None"}<br>Protection: ${r.waf.level}`)}
-${section("DNS", Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))}
-${section("Ports", Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"))}
-${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
-`;
-    document.getElementById("scanOut").innerHTML = `<pre>${out}</pre>`;
-    setStatus("Scan completed.");
+
+Tech: ${r.tech.join(", ")||"None"}
+CMS Version: ${r.version.join(", ")||"None"}
+
+WAF: ${r.waf.vendors.join(", ")||"None"} (${r.waf.level})
+Risk: ${r.risk.level} (score ${r.risk.score})
+
+Admin Login Paths:
+${r.admin.join("\n")}`;
+
+    document.getElementById("status").textContent="Status: done";
   }catch(e){
-    setStatus("Scan failed (CORS/proxy/timeout).");
+    document.getElementById("output").textContent="Scan failed (proxy/CORS/timeout).";
+    document.getElementById("status").textContent="Status: failed";
     setProgress(0);
-    document.getElementById("scanOut").innerHTML = "<pre>Scan failed. Try another target.</pre>";
   }
 }
 
-// admin detect
-async function adminDetect(domain){
-  setStatus("Detecting admin login...");
-  const results=[];
-  let total=adminPaths.length;
-  for(let i=0;i<total;i++){
-    const p = adminPaths[i];
-    try{
-      const res = await timeoutFetch(PROXY + "http://" + domain + p, 5000);
-      const ok = res.status===200 || (res.status>=300 && res.status<400) || res.status===401 || res.status===403;
-      results.push({path:p,status:res.status,ok});
-    }catch{
-      results.push({path:p,status:"fail",ok:false});
-    }
-    setProgress(Math.round(((i+1)/total)*100));
+function exportReport(){
+  if(!lastReport){
+    alert("No report to export.");
+    return;
   }
-  setStatus("Admin detect finished.");
-
-  const found = results.filter(x=>x.ok);
-  document.getElementById("adminOut").innerHTML = `<pre>${found.length ? "FOUND:\n" + found.map(x=>`${x.path} => ${x.status}`).join("\n") : "No admin login detected."}\n\nALL:\n${results.map(x=>`${x.path} => ${x.status}`).join("\n")}</pre>`;
+  const blob = new Blob([JSON.stringify(lastReport,null,2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download="orca_report.json"; a.click();
+  URL.revokeObjectURL(url);
 }
 
-// lab
-function buildUrl(domain, ep, payload, method){
-  const base = PROXY + "http://" + domain;
-  if(method==="GET"){
-    const sep = ep.includes("?") ? "&" : "?";
-    return base + ep + sep + encodeURIComponent(payload);
-  }
-  return base + ep;
-}
-async function labRun(){
-  const domain = clean(document.getElementById("scanTarget").value);
+// Lab
+async function labTest(){
+  const domain = cleanDomain(document.getElementById("target").value);
+  if(!domain){ document.getElementById("labOut").textContent="Enter target first."; return; }
+
   const ep = document.getElementById("labEndpoint").value.trim();
   const method = document.getElementById("labMethod").value;
   const payload = document.getElementById("labPayload").value.trim();
-  if(!domain || !ep || !payload){
-    document.getElementById("labOut").innerHTML = "<pre>Target, endpoint & payload required.</pre>";
-    return;
-  }
-  const url = buildUrl(domain, ep, payload, method);
+
+  if(!ep){ document.getElementById("labOut").textContent="Endpoint required."; return; }
+
+  const url = PROXY_BASE + domain + (ep.startsWith("/") ? ep : "/" + ep);
+
   try{
     const res = await timeoutFetch(url, 8000);
     const text = await res.text();
-    document.getElementById("labOut").innerHTML = `<pre>Status: ${res.status}\nURL: ${res.url}\n\n${text.slice(0,500)}</pre>`;
-  }catch{
-    document.getElementById("labOut").innerHTML = "<pre>Lab request failed (CORS/proxy/timeout).</pre>";
-  }
-}
-async function labValidate(){
-  const domain = clean(document.getElementById("scanTarget").value);
-  const ep = document.getElementById("labEndpoint").value.trim();
-  const method = document.getElementById("labMethod").value;
-  if(!domain || !ep){
-    document.getElementById("labOut").innerHTML = "<pre>Target + endpoint required.</pre>";
-    return;
-  }
-  const token = "ORCA_" + Math.random().toString(36).substring(2, 10).toUpperCase();
-  const payload = `echo ${token}`;
-  const url = buildUrl(domain, ep, payload, method);
-  try{
-    const res = await timeoutFetch(url, 8000);
-    const text = await res.text();
-    const ok = text.includes(token);
-    document.getElementById("labOut").innerHTML = `<pre>VALIDATION RESULT: ${ok ? "VALID" : "NOT VALID"}\nToken: ${token}\n\n${text.slice(0,500)}</pre>`;
-  }catch{
-    document.getElementById("labOut").innerHTML = "<pre>Validation failed (CORS/proxy/timeout).</pre>";
+    document.getElementById("labOut").textContent =
+      `Status: ${res.status}
+URL: ${res.url}
+Response snippet:
+${text.slice(0, 500)}`;
+  }catch(e){
+    document.getElementById("labOut").textContent="Lab request failed (CORS/proxy/timeout).";
   }
 }
 
-// tabs
-document.querySelectorAll(".tab").forEach(t=>{
-  t.addEventListener("click", ()=>{
-    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
-    t.classList.add("active");
-    document.querySelectorAll(".tab-content").forEach(c=>c.style.display="none");
-    document.getElementById("tab-"+t.dataset.tab).style.display="block";
-  });
-});
-
-// buttons
-document.getElementById("btnTheme").addEventListener("click", ()=>{
+// Theme
+function toggleTheme(){
   const root = document.documentElement;
   const t = root.getAttribute("data-theme");
   root.setAttribute("data-theme", t==="dark" ? "light" : "dark");
-});
-document.getElementById("btnExport").addEventListener("click", exportReport);
-document.getElementById("btnHistory").addEventListener("click", ()=>{
-  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
-  document.querySelector('.tab[data-tab="history"]').classList.add("active");
-  document.querySelectorAll(".tab-content").forEach(c=>c.style.display="none");
-  document.getElementById("tab-history").style.display="block";
-  renderHistory();
-});
-document.getElementById("btnScan").addEventListener("click", ()=>{
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){ setStatus("Target required."); return; }
-  document.getElementById("scanTarget").value = domain;
-  runScan(domain);
-});
-document.getElementById("scanBtn").addEventListener("click", ()=>{
-  const domain = clean(document.getElementById("scanTarget").value);
-  if(!domain){ setStatus("Target required."); return; }
-  runScan(domain);
-});
-document.getElementById("labRun").addEventListener("click", labRun);
-document.getElementById("labValidate").addEventListener("click", labValidate);
-document.getElementById("adminBtn").addEventListener("click", ()=>{
-  const domain = clean(document.getElementById("adminTarget").value);
-  if(!domain){ setStatus("Target required."); return; }
-  adminDetect(domain);
+}
+
+// Tabs
+document.querySelectorAll(".navbtn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".navbtn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const tab = btn.getAttribute("data-tab");
+    document.querySelectorAll(".tab").forEach(t=>t.style.display="none");
+    document.getElementById("tab-"+tab).style.display="block";
+  });
 });
 
-// initial
-setProgress(0);
-setStatus("Idle");
+document.getElementById("scanBtn").addEventListener("click", runScan);
+document.getElementById("exportBtn").addEventListener("click", exportReport);
+document.getElementById("clearHistoryBtn").addEventListener("click", clearHistory);
+document.getElementById("labBtn").addEventListener("click", labTest);
+document.getElementById("themeBtn").addEventListener("click", toggleTheme);
+
+document.getElementById("target").addEventListener("keydown", (e)=>{
+  if(e.key==="Enter") runScan();
+});
+
 renderHistory();
 </script>
 </body>
