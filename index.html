@@ -1,201 +1,278 @@
-/* ----------------- WAF TOLERANCE TEST (SAFE) ----------------- */
-async function wafToleranceTest(){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("labOut").textContent="Target required.";
-    return;
-  }
-
-  const ep = "/"; // safe endpoint
-  const payloads = [
-    "' OR '1'='1",
-    "<script>alert(1)</script>",
-    "UNION SELECT NULL",
-    "../../../../etc/passwd"
-  ];
-
-  let results = [];
-  for(const p of payloads){
-    const url = PROXY + "http://" + domain + ep + "?test=" + encodeURIComponent(p);
-    try{
-      const start = performance.now();
-      const r = await timeoutFetch(url, 8000);
-      const end = performance.now();
-      const time = Math.round(end - start);
-      const blocked = r.status===403 || r.status===406 || r.status===429;
-      results.push(`${p} => status:${r.status} time:${time}ms blocked:${blocked ? "YES" : "NO"}`);
-    }catch(e){
-      results.push(`${p} => request failed`);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scanner Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: #fff;
+      padding: 20px;
     }
-  }
-
-  document.getElementById("labOut").textContent =
-    `WAF Tolerance Test (SAFE):\n` + results.join("\n");
-}
-
-/* ----------------- ADMIN BRUTE (DEFAULT + FILE) + RESUME ----------------- */
-async function adminBrute(resume=false){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("adminOut").textContent="Target required.";
-    return;
-  }
-
-  if(!resume){
-    bruteState.admin.running = true;
-    bruteState.admin.index = 0;
-    bruteState.admin.found = [];
-    bruteState.admin.list = [];
-  }
-
-  bruteState.admin.running = true;
-
-  let list = bruteState.admin.list;
-  if(!list.length){
-    const defaultList = [
-      "admin","administrator","admin/login","admin/index","adminpanel","adminarea","cpanel",
-      "wp-admin","wp-login.php","administrator/index.php","user/login","login","dashboard",
-      "backend","admin1","admin2","manager","login.php","admin.php","admin/login.php",
-      "adminpanel.php","adminarea.php","admin/home","admin/dashboard","admin/login",
-      "panel","sysadmin","portal","adminconsole","console","webadmin","siteadmin",
-      "wp-admin.php","wp-login.php"
-    ];
-
-    list = [...defaultList];
-    const fileInput = document.getElementById("adminWordlistFile");
-    if(fileInput.files.length){
-      const file = fileInput.files[0];
-      const text = await file.text();
-      const lines = text.split("\n").map(x=>x.trim()).filter(Boolean);
-      list = [...new Set([...list, ...lines])];
+    input, button {
+      padding: 10px;
+      margin: 5px 0;
     }
-    bruteState.admin.list = list;
-  }
+    .box {
+      border: 1px solid #444;
+      padding: 10px;
+      margin: 10px 0;
+      background: #1e1e1e;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body>
 
-  while(bruteState.admin.running && bruteState.admin.index < list.length){
-    const p = list[bruteState.admin.index];
-    bruteState.admin.index++;
+  <h2>Scanner Tool</h2>
 
-    try{
-      const r = await timeoutFetch(PROXY+"http://"+domain+"/"+p, 4000);
-      if(r.status===200){
-        bruteState.admin.found.push("/"+p);
+  <div class="box">
+    <label>Target Domain (contoh: example.com):</label><br />
+    <input id="target" type="text" placeholder="example.com" />
+  </div>
+
+  <div class="box">
+    <button onclick="wafToleranceTest()">WAF Tolerance Test</button>
+    <button onclick="adminBrute()">Admin Brute</button>
+    <button onclick="csrfChecker()">CSRF Checker</button>
+    <button onclick="subdomainBrute()">Subdomain Brute</button>
+    <button onclick="wpPluginThemeDetect()">WP Detect</button>
+  </div>
+
+  <div class="box">
+    <h3>Output</h3>
+    <pre id="labOut"></pre>
+    <pre id="adminOut"></pre>
+    <pre id="subOut"></pre>
+  </div>
+
+  <script>
+    // ----------------- CONFIG -----------------
+    const PROXY = "https://corsproxy.io/?"; // Ganti sesuai proxy Anda
+    const bruteState = {
+      admin: { running: false, index: 0, found: [], list: [] },
+      sub: { running: false, index: 0, found: [], list: [] }
+    };
+
+    // ----------------- HELPERS -----------------
+    function clean(s) {
+      return (s || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+    }
+
+    function escapeHTML(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function timeoutFetch(url, ms) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout")), ms);
+        fetch(url)
+          .then(res => {
+            clearTimeout(timer);
+            resolve(res);
+          })
+          .catch(err => {
+            clearTimeout(timer);
+            reject(err);
+          });
+      });
+    }
+
+    // ----------------- WAF TOLERANCE TEST -----------------
+    async function wafToleranceTest(){
+      const domain = clean(document.getElementById("target").value);
+      if(!domain){
+        document.getElementById("labOut").innerHTML="Target required.";
+        return;
       }
-    }catch{}
 
-    document.getElementById("adminOut").textContent =
-      `Admin Brute Result:\nFound: ${bruteState.admin.found.length ? bruteState.admin.found.join(", ") : "None"}\nChecked: ${bruteState.admin.index}/${list.length}`;
+      const ep = "/";
+      const payloads = [
+        "' OR '1'='1",
+        "<script>alert(1)</script>",
+        "UNION SELECT NULL",
+        "../../../../etc/passwd"
+      ];
 
-    await new Promise(r=>setTimeout(r, 150));
-  }
+      let results = [];
+      for(const p of payloads){
+        const url = PROXY + "http://" + domain + ep + "?test=" + encodeURIComponent(p);
 
-  if(!bruteState.admin.running){
-    document.getElementById("adminOut").textContent += "\n\nPaused. Press Resume to continue.";
-  }
-}
+        try{
+          const start = performance.now();
+          const r = await timeoutFetch(url, 8000);
+          const end = performance.now();
+          const time = Math.round(end - start);
 
-/* ----------------- CSRF TOKEN CHECKER ----------------- */
-function csrfChecker(){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("adminOut").textContent="Target required.";
-    return;
-  }
+          const status = r?.status || "no response";
+          const blocked = status === 403 || status === 406 || status === 429;
 
-  const body = lastReport?.http?.body || "";
-  const forms = [...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
-  if(!forms.length){
-    document.getElementById("adminOut").textContent="No forms found on homepage.";
-    return;
-  }
-
-  let issues = [];
-  forms.forEach((f, idx)=>{
-    const formHtml = f[0];
-    const hasCSRF = /csrf|token|_csrf|csrf_token/i.test(formHtml);
-    if(!hasCSRF){
-      issues.push(`Form ${idx+1}: MISSING CSRF token`);
-    }
-  });
-
-  document.getElementById("adminOut").textContent =
-    `CSRF Token Checker:\n${issues.length ? issues.join("\n") : "All forms contain CSRF token (or token-like field)."}\n\n(Note: token detection is heuristic-based.)`;
-}
-
-/* ----------------- SUBDOMAIN BRUTE FORCE (UPLOAD WORDLIST) + RESUME ----------------- */
-async function subdomainBrute(resume=false){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("subOut").textContent="Target required.";
-    return;
-  }
-
-  if(!resume){
-    bruteState.sub.running = true;
-    bruteState.sub.index = 0;
-    bruteState.sub.found = [];
-    bruteState.sub.list = [];
-  }
-
-  bruteState.sub.running = true;
-
-  let list = bruteState.sub.list;
-  if(!list.length){
-    list = ["www","mail","api","dev","staging","test","admin","portal","blog","shop","cdn","static","app","vpn","secure","img","upload","files","backup","beta"];
-    const fileInput = document.getElementById("subWordlistFile");
-    if(fileInput.files.length){
-      const file = fileInput.files[0];
-      const text = await file.text();
-      const lines = text.split("\n").map(x=>x.trim()).filter(Boolean);
-      list = [...new Set([...list, ...lines])];
-    }
-    bruteState.sub.list = list;
-  }
-
-  while(bruteState.sub.running && bruteState.sub.index < list.length && bruteState.sub.index < 200){
-    const s = list[bruteState.sub.index];
-    bruteState.sub.index++;
-
-    try{
-      const r = await timeoutFetch(PROXY+"http://"+s+"."+domain, 3000);
-      if(r.status===200){
-        bruteState.sub.found.push(s+"."+domain);
+          results.push(`${p} => status:${status} time:${time}ms blocked:${blocked ? "YES" : "NO"}`);
+        }catch(e){
+          results.push(`${p} => request failed`);
+        }
       }
-    }catch{}
 
-    document.getElementById("subOut").textContent =
-      `Subdomain Brute Result:\nFound: ${bruteState.sub.found.length ? bruteState.sub.found.join("\n") : "None"}\nChecked: ${bruteState.sub.index}/${Math.min(list.length, 200)}`;
+      document.getElementById("labOut").innerHTML =
+        `WAF Tolerance Test (SAFE):<br>` + results.map(x => escapeHTML(x)).join("<br>");
+    }
 
-    await new Promise(r=>setTimeout(r, 150));
-  }
+    // ----------------- ADMIN BRUTE -----------------
+    async function adminBrute(resume=false){
+      const domain = clean(document.getElementById("target").value);
+      if(!domain){
+        document.getElementById("adminOut").innerHTML="Target required.";
+        return;
+      }
 
-  if(!bruteState.sub.running){
-    document.getElementById("subOut").textContent += "\n\nPaused. Press Resume to continue.";
-  }
-}
+      if(!resume){
+        bruteState.admin.running = true;
+        bruteState.admin.index = 0;
+        bruteState.admin.found = [];
+        bruteState.admin.list = [];
+      }
 
-/* ----------------- WP PLUGIN/THEME DETECTION ----------------- */
-async function wpPluginThemeDetect(){
-  const domain = clean(document.getElementById("target").value);
-  if(!domain){
-    document.getElementById("subOut").textContent="Target required.";
-    return;
-  }
+      bruteState.admin.running = true;
 
-  const url = PROXY+"http://"+domain;
-  try{
-    const res = await timeoutFetch(url, 8000);
-    const body = await res.text();
+      let list = bruteState.admin.list;
+      if(!list.length){
+        list = ["admin","administrator","admin/login","admin/index","adminpanel","adminarea","cpanel","wp-admin","wp-login.php"];
+        bruteState.admin.list = list;
+      }
 
-    const plugins = [...body.matchAll(/wp-content\/plugins\/([^\/]+)\//gi)].map(x=>x[1]);
-    const themes = [...body.matchAll(/wp-content\/themes\/([^\/]+)\//gi)].map(x=>x[1]);
+      while(bruteState.admin.running && bruteState.admin.index < list.length){
+        const p = list[bruteState.admin.index];
+        bruteState.admin.index++;
 
-    const puniq = [...new Set(plugins)];
-    const tuniq = [...new Set(themes)];
+        try{
+          const r = await timeoutFetch(PROXY+"http://"+domain+"/"+p, 4000);
+          if(r && r.status === 200){
+            bruteState.admin.found.push("/"+p);
+          }
+        }catch(e){}
 
-    document.getElementById("subOut").textContent =
-      `WP Plugin/Theme Detection:\nPlugins: ${puniq.length ? puniq.join(", ") : "None"}\nThemes: ${tuniq.length ? tuniq.join(", ") : "None"}\n\nNote: Only works if WP assets are exposed in HTML.`;
-  }catch(e){
-    document.getElementById("subOut").textContent="Failed (CORS/proxy/timeout)";
-  }
-}
+        const output =
+          `Admin Brute Result:<br>` +
+          `Found: ${bruteState.admin.found.length ? escapeHTML(bruteState.admin.found.join(", ")) : "None"}<br>` +
+          `Checked: ${bruteState.admin.index}/${list.length}`;
+
+        document.getElementById("adminOut").innerHTML = output;
+        await new Promise(r=>setTimeout(r, 150));
+      }
+    }
+
+    // ----------------- CSRF CHECKER -----------------
+    function csrfChecker(){
+      const domain = clean(document.getElementById("target").value);
+      if(!domain){
+        document.getElementById("adminOut").innerHTML="Target required.";
+        return;
+      }
+
+      const body = ""; // karena tidak ada source HTML, ini hanya placeholder
+      const forms = [...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
+      if(!forms.length){
+        document.getElementById("adminOut").innerHTML="No forms found on homepage.";
+        return;
+      }
+
+      let issues = [];
+      forms.forEach((f, idx)=>{
+        const formHtml = f[0];
+        const hasCSRF = /csrf|token|_csrf|csrf_token/i.test(formHtml);
+        if(!hasCSRF){
+          issues.push(`Form ${idx+1}: MISSING CSRF token`);
+        }
+      });
+
+      document.getElementById("adminOut").innerHTML =
+        `CSRF Token Checker:<br>` +
+        (issues.length ? escapeHTML(issues.join("<br>")) : "All forms contain CSRF token (or token-like field).") +
+        "<br><br>(Note: token detection is heuristic-based.)";
+    }
+
+    // ----------------- SUBDOMAIN BRUTE -----------------
+    async function subdomainBrute(resume=false){
+      const domain = clean(document.getElementById("target").value);
+      if(!domain){
+        document.getElementById("subOut").innerHTML="Target required.";
+        return;
+      }
+
+      if(!resume){
+        bruteState.sub.running = true;
+        bruteState.sub.index = 0;
+        bruteState.sub.found = [];
+        bruteState.sub.list = [];
+      }
+
+      bruteState.sub.running = true;
+
+      let list = bruteState.sub.list;
+      if(!list.length){
+        list = ["www","mail","api","dev","staging","test","admin","portal","blog","shop","cdn","static","app","vpn","secure","img","upload","files","backup","beta"];
+        bruteState.sub.list = list;
+      }
+
+      while(bruteState.sub.running && bruteState.sub.index < list.length && bruteState.sub.index < 200){
+        const s = list[bruteState.sub.index];
+        bruteState.sub.index++;
+
+        try{
+          const r = await timeoutFetch(PROXY+"http://"+s+"."+domain, 3000);
+          if(r && r.status === 200){
+            bruteState.sub.found.push(s+"."+domain);
+          }
+        }catch(e){}
+
+        const output =
+          `Subdomain Brute Result:<br>` +
+          `Found: ${bruteState.sub.found.length ? escapeHTML(bruteState.sub.found.join("<br>")) : "None"}<br>` +
+          `Checked: ${bruteState.sub.index}/${Math.min(list.length, 200)}`;
+
+        document.getElementById("subOut").innerHTML = output;
+        await new Promise(r=>setTimeout(r, 150));
+      }
+    }
+
+    // ----------------- WP DETECT -----------------
+    async function wpPluginThemeDetect(){
+      const domain = clean(document.getElementById("target").value);
+      if(!domain){
+        document.getElementById("subOut").innerHTML="Target required.";
+        return;
+      }
+
+      const url = PROXY+"http://"+domain;
+      try{
+        const res = await timeoutFetch(url, 8000);
+        const body = await res.text();
+
+        const plugins = [...body.matchAll(/wp-content\/plugins\/([^\/]+)\//gi)].map(x=>x[1]);
+        const themes = [...body.matchAll(/wp-content\/themes\/([^\/]+)\//gi)].map(x=>x[1]);
+
+        const puniq = [...new Set(plugins)];
+        const tuniq = [...new Set(themes)];
+
+        document.getElementById("subOut").innerHTML =
+          `WP Plugin/Theme Detection:<br>` +
+          `Plugins: ${puniq.length ? escapeHTML(puniq.join(", ")) : "None"}<br>` +
+          `Themes: ${tuniq.length ? escapeHTML(tuniq.join(", ")) : "None"}<br><br>` +
+          `Note: Only works if WP assets are exposed in HTML.`;
+      }catch(e){
+        document.getElementById("subOut").innerHTML="Failed (CORS/proxy/timeout)";
+      }
+    }
+  </script>
+</body>
+</html>
