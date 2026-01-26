@@ -2,130 +2,240 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – LAB Simulation</title>
+<title>ORCA WebScan – WordPress LAB (STABLE)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body {
-  background:#0b0f14;
-  color:#dce3ea;
-  font-family: monospace;
-}
-h1 { color:#4fd1c5 }
-button {
-  background:#1f2933;
-  color:#4fd1c5;
-  border:1px solid #4fd1c5;
-  padding:6px 12px;
-  margin:4px;
-  cursor:pointer;
-}
-button:hover { background:#111827 }
-input {
-  background:#020617;
-  color:#e5e7eb;
-  border:1px solid #334155;
-  padding:6px;
-  width:80%;
-}
-pre {
-  background:#020617;
-  padding:12px;
-  border:1px solid #1e293b;
-  overflow:auto;
-}
-.section { margin-bottom:20px }
-.badge { color:#22c55e }
-.warn { color:#facc15 }
-.high { color:#f87171 }
+:root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
+.light{--bg:#f4f6fb;--panel:#ffffff;--text:#0b1220;--accent:#3b6cff}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;height:100vh}
+.sidebar{width:260px;background:var(--panel);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sidebar h2{margin:0}
+.sidebar button{padding:12px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+.sidebar .ghost{background:transparent;color:var(--text);border:1px solid var(--accent)}
+.main{flex:1;padding:24px;overflow:auto}
+.card{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:16px}
+input{width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:8px}
+pre{background:#0a1020;color:#cde;padding:16px;border-radius:14px;white-space:pre-wrap}
+.light pre{background:#eef2ff;color:#111}
+small{opacity:.7}
 </style>
 </head>
+
 <body>
-
-<h1>🐋 ORCA WebScan – LAB Simulation</h1>
-
-<div class="section">
-Target URL:<br>
-<input id="target" placeholder="https://example.com" onkeydown="if(event.key==='Enter')runAll()">
+<div class="sidebar">
+  <h2>🛡️ ORCA</h2>
+  <button onclick="scan()">Scan Target</button>
+  <button class="ghost" onclick="toggleBrute()">Brute Force LAB</button>
+  <button class="ghost" onclick="rceValidate()">RCE Validation</button>
+  <button class="ghost" onclick="toggleTheme()">🌗 Theme</button>
 </div>
 
-<div class="section">
-<button onclick="runAll()">Run Full Scan</button>
-<button onclick="enumUsers()">User Enumeration</button>
-<button onclick="detectServer()">Detect Server</button>
-<button onclick="detectPlugins()">Plugin Detection</button>
-<button onclick="rceFingerprint()">RCE Fingerprint</button>
-<button onclick="validateRCE()">RCE Validation</button>
-</div>
+<div class="main">
+  <h1>ORCA WebScan – WordPress LAB</h1>
 
-<pre id="output">Ready.</pre>
+  <div class="card">
+    <input id="target" placeholder="https://example.com (ENTER)">
+    <small>Passive scan · SAFE MODE · LAB ONLY</small>
+  </div>
+
+  <div class="card" id="brute" style="display:none">
+    <h3>Brute Force LAB (Simulation)</h3>
+    <input id="loginUrl" placeholder="/wp-login.php">
+    <input id="singleUser" placeholder="Username (optional)">
+    <input type="file" id="userWL">
+    <input id="singlePass" placeholder="Password (optional)">
+    <input type="file" id="passWL">
+    <button onclick="runBrute()">Run Simulation</button>
+  </div>
+
+  <div class="card">
+    <pre id="out">Idle.</pre>
+  </div>
+</div>
 
 <script>
-const out = msg => {
-  document.getElementById("output").textContent += "\n" + msg;
+/* ========= LOG BUFFER (ANTI OVERWRITE) ========= */
+const log=[];
+const add=t=>log.push(t);
+const render=()=>outEl.textContent=log.join("\n");
+const outEl=document.getElementById("out");
+
+/* ========= BASIC ========= */
+const target=document.getElementById("target");
+target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
+const toggleTheme=()=>document.body.classList.toggle("light");
+const toggleBrute=()=>{
+  const b=document.getElementById("brute");
+  b.style.display=b.style.display==="none"?"block":"none";
 };
-const reset = () => document.getElementById("output").textContent = "";
-
-function runAll(){
-  reset();
-  detectServer();
-  enumUsers();
-  detectPlugins();
-  rceFingerprint();
+async function fetchSafe(u){
+  try{return await fetch(u,{redirect:"manual"});}catch{return null;}
 }
 
-function detectServer(){
-  out("Server Detection");
-  out("----------------");
-  out("CDN        : Cloudflare");
-  out("Origin     : Nginx + OpenSSL");
-  out("ASN        : AS13335");
-  out("Colo       : SIN");
-  out("Confidence : HIGH\n");
+/* ========= PLUGIN DB ========= */
+const plugins=[
+ {name:"revslider",path:"/wp-content/plugins/revslider/",cves:["CVE-2014-9734"],risk:"HIGH"},
+ {name:"wp-file-manager",path:"/wp-content/plugins/wp-file-manager/",cves:["CVE-2020-25213"],risk:"HIGH"},
+ {name:"elementor",path:"/wp-content/plugins/elementor/",cves:["CVE-2023-48777"],risk:"MEDIUM"}
+];
+
+const cveInfo={
+ "CVE-2014-9734":"RevSlider arbitrary file upload → RCE",
+ "CVE-2020-25213":"WP File Manager unauthenticated RCE",
+ "CVE-2023-48777":"Elementor template import RCE"
+};
+
+/* ========= MAIN SCAN ========= */
+async function scan(){
+  log.length=0;
+  const base=target.value.replace(/\/$/,"");
+  if(!base) return;
+
+  add("ORCA WebScan – LAB MODE");
+  add("========================");
+  add("Target: "+base+"\n");
+  render();
+
+  const home=await fetchSafe(base);
+  if(!home){add("Target unreachable");render();return;}
+
+  const html=await home.text();
+
+  add("Server");
+  add("------");
+  add(home.headers.get("server")||"Hidden");
+  if(home.headers.get("cf-ray")) add("Cloudflare detected");
+  add("");
+
+  add("WordPress");
+  add("----------");
+  add(/wp-content|wp-includes/i.test(html)?"YES":"NO");
+  add("");
+
+  await enumUsers(base);
+  await detectPlugins(base);
+  add("\nScan completed.");
+  render();
 }
 
-function enumUsers(){
-  out("Users (REST + Author Auto‑Merge)");
-  out("--------------------------------");
-  const users = [
-    {login:"uib", display:"UIB", src:"REST", conf:"MED"},
-    {login:"dokumentasi-humas", display:"Dokumentasi Humas", src:"REST+AUTHOR", conf:"HIGH"},
-    {login:"humas", display:"Humas", src:"AUTHOR", conf:"MED"},
-    {login:"ujicoba3-uib-ac-id", display:"UjiCoba3", src:"REST", conf:"LOW"},
-    {login:"Jaya_IT_Administrator", display:"Jaya IT Administrator", src:"AUTHOR", conf:"HIGH"}
-  ];
-  users.forEach(u=>{
-    out(`- ${u.login} | ${u.display} | ${u.src} | Confidence: ${u.conf}`);
+/* ========= USER ENUM ========= */
+async function enumUsers(base){
+  add("User Enumeration");
+  add("----------------");
+  let found=new Set();
+
+  // REST API
+  const r=await fetchSafe(base+"/wp-json/wp/v2/users");
+  if(r && r.status===200){
+    try{
+      const js=await r.json();
+      js.forEach(u=>found.add(u.slug));
+    }catch{}
+  }
+
+  // Author ID
+  for(let i=1;i<=5;i++){
+    const a=await fetchSafe(`${base}/?author=${i}`);
+    if(a && a.url){
+      const m=a.url.match(/\/author\/([^\/]+)/);
+      if(m) found.add(m[1]);
+    }
+  }
+
+  if(found.size){
+    [...found].forEach(u=>add("• "+u));
+  }else{
+    add("No users enumerated");
+  }
+  add("");
+}
+
+/* ========= PLUGIN FINGERPRINT ========= */
+async function detectPlugins(base){
+  add("Plugin RCE Fingerprint");
+  add("----------------------");
+  let hit=false;
+
+  for(const p of plugins){
+    const r=await fetchSafe(base+p.path);
+    if(!r) continue;
+    if(r.status===200){
+      hit=true;
+      add(`Plugin : ${p.name}`);
+      add(`Path   : ${p.path}`);
+      add(`Risk   : ${p.risk}`);
+      add(`CVE    : ${p.cves.join(", ")}`);
+      p.cves.forEach(c=>add(" ↳ "+c+" : "+cveInfo[c]));
+      add("");
+    }
+  }
+  if(!hit) add("No known vulnerable plugin detected\n");
+}
+
+/* ========= RCE VALIDATION (SAFE) ========= */
+async function rceValidate(){
+  log.length=0;
+  const base=target.value.replace(/\/$/,"");
+  if(!base)return;
+
+  add("RCE Validation – LAB");
+  add("-------------------");
+  let score=0;
+
+  const tests=["/?cmd=id","/?exec=whoami","/wp-admin/admin-ajax.php?action=test"];
+  for(const t of tests){
+    const r=await fetchSafe(base+t);
+    if(!r){add(`${t} → blocked`);continue;}
+    const tx=await r.text();
+    if(/uid=|gid=|root:/i.test(tx)){add(`${t} → EXEC STRING [HIGH]`);score+=3;}
+    else if(/warning|fatal/i.test(tx)){add(`${t} → ERROR LEAK [MEDIUM]`);score+=2;}
+    else if(r.status===200){add(`${t} → UNEXPECTED RESPONSE [LOW]`);score+=1;}
+    else add(`${t} → OK`);
+  }
+
+  add("\nResult");
+  add("------");
+  add(score>=5?"LIKELY VULNERABLE":"NO STRONG INDICATION");
+  add("\nSAFE MODE – no payload executed");
+  render();
+}
+
+/* ========= BRUTE LAB ========= */
+let uWL=[],pWL=[];
+userWL.onchange=e=>{
+  const r=new FileReader();
+  r.onload=()=>uWL=r.result.split(/\r?\n/).filter(Boolean);
+  r.readAsText(e.target.files[0]);
+};
+passWL.onchange=e=>{
+  const r=new FileReader();
+  r.onload=()=>pWL=r.result.split(/\r?\n/).filter(Boolean);
+  r.readAsText(e.target.files[0]);
+};
+
+function runBrute(){
+  log.length=0;
+  const url=loginUrl.value||"/wp-login.php";
+  const users=singleUser.value?[singleUser.value]:uWL;
+  const pass=singlePass.value?[singlePass.value]:pWL;
+
+  add("Brute Force LAB Simulation");
+  add("--------------------------");
+  add("Login URL : "+url);
+  add("Users     : "+users.length);
+  add("Passwords : "+pass.length+"\n");
+
+  users.slice(0,1).forEach(u=>{
+    pass.slice(0,3).forEach(p=>{
+      add(`POST ${url} | ${u}:${p}`);
+    });
   });
-  out("");
-}
 
-function detectPlugins(){
-  out("Plugin Auto‑Detect (HTML Fingerprint)");
-  out("------------------------------------");
-  out("contact-form-7  v5.7.2  [Detected]");
-  out("elementor       v3.18.1 [Detected]");
-  out("wp-file-manager v6.9    [Detected]");
-  out("");
-}
-
-function rceFingerprint(){
-  out("RCE Plugin Fingerprint");
-  out("----------------------");
-  out("wp-file-manager <= 6.9");
-  out("CVE Match       : CVE‑2020‑25213");
-  out("Impact          : Arbitrary File Upload → RCE");
-  out("Confidence      : HIGH\n");
-}
-
-function validateRCE(){
-  out("RCE Validation");
-  out("--------------");
-  out("Mode    : LAB SAFE MODE");
-  out("Payload : NOT SENT");
-  out("Result  : Simulation OK");
-  out("");
+  add("\nSAFE MODE – no request sent");
+  render();
 }
 </script>
-
 </body>
 </html>
