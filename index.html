@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ORCA WebScan (New)</title>
+<title>ORCA WebScan (Stable)</title>
 <style>
   :root{
     --navy:#0b1d3a;
@@ -133,8 +133,6 @@
     align-items:center;
   }
   .row > *{ flex:1; }
-  .row .w-30{ flex:0 0 30%; }
-  .row .w-70{ flex:0 0 70%; }
   .badge{
     display:inline-block;
     padding:4px 8px;
@@ -170,13 +168,6 @@
     background:var(--navy);
     transition: width .2s ease;
   }
-  .footer{
-    margin-top:14px;
-    font-size:13px;
-    color:#666;
-    text-align:center;
-  }
-  [data-theme="dark"] .footer{ color:#b8c3d7; }
 </style>
 </head>
 <body>
@@ -208,10 +199,6 @@
       <div class="row">
         <input id="scanTarget" placeholder="domain.com" />
         <button id="scanBtn">Scan</button>
-      </div>
-      <div class="row" style="margin-top:12px;">
-        <button id="btnScanQuick">Quick Scan</button>
-        <button id="btnScanDeep">Deep Scan</button>
       </div>
       <div id="scanOut" style="margin-top:12px;">
         <pre>No scan yet.</pre>
@@ -299,31 +286,6 @@ async function scanHTTP(domain){
   r.headers.forEach((v,k)=> headersObj[k]=v);
   return {status:r.status, url:r.url, headers:headersObj, body:text, https:r.url.startsWith("https")};
 }
-function techFingerprint(http){
-  const tech=[];
-  const body=http.body||"";
-  const server=http.headers["server"]||"";
-  const patterns=[
-    ["WordPress", /wp-content|wp-includes/i],
-    ["Joomla", /Joomla!/i],
-    ["Drupal", /drupal/i],
-    ["Magento", /Magento/i],
-    ["Shopify", /shopify/i],
-    ["Laravel", /laravel/i],
-    ["Express", /express/i],
-    ["Django", /django/i],
-    ["Ruby on Rails", /rails/i],
-    ["Next.js", /next\.js/i],
-    ["React", /react/i],
-    ["Angular", /angular/i]
-  ];
-  patterns.forEach(p=>{
-    if(p[1].test(body) || server.toLowerCase().includes(p[0].toLowerCase())){
-      tech.push(p[0]);
-    }
-  });
-  return [...new Set(tech)];
-}
 function scanHeaders(h){
   const headersCheck=[
     "content-security-policy",
@@ -372,92 +334,11 @@ function detectWAF(headers, body){
   }
   return {vendors:[...new Set(waf)], level};
 }
-function xssIndicators(http){
-  const issues=[];
-  const h=http.headers;
-  const body=http.body||"";
-  if(!h["content-security-policy"]) issues.push("Missing CSP");
-  if(/<script[\s>]/i.test(body)) issues.push("Inline <script> present");
-  if(/innerHTML\s*=|document\.write|eval\(/i.test(body)) issues.push("DOM XSS sink pattern");
-  if(!h["x-xss-protection"]) issues.push("X-XSS-Protection missing (legacy)");
-  return issues;
-}
-function sqliIndicators(http){
-  const issues=[];
-  const body=http.body||"";
-  const err=[
-    /sql syntax/i,
-    /mysql_fetch|mysqli_/i,
-    /ORA-\d+/i,
-    /ODBC SQL Server/i,
-    /Unclosed quotation mark/i,
-    /SQLite\/JDBC/i,
-    /syntax error at or near/i
-  ];
-  if(err.some(r=>r.test(body))) issues.push("SQL error pattern in response");
-  const url = http.url || "";
-  const hasParams = url.includes("?");
-  if(hasParams){
-    const params = url.split("?")[1];
-    if(/('|%27|--|;|or%20|and%20)/i.test(params))
-      issues.push("Suspicious SQL chars in URL parameters");
-  }
-  return issues;
-}
-function rceIndicators(http){
-  const issues=[];
-  const body=http.body||"";
-  const patterns=[
-    /command not found/i,
-    /popen\(/i,
-    /exec\(/i,
-    /system\(/i,
-    /shell_exec\(/i,
-    /Permission denied/i,
-    /cannot execute/i
-  ];
-  if(patterns.some(r=>r.test(body))) issues.push("Command execution error pattern in response");
-  if(http.url.includes("cmd=") || http.url.includes("exec=") || http.url.includes("command="))
-    issues.push("Command-like parameter name detected");
-  return issues;
-}
-function formIssues(body){
-  const issues=[];
-  const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
-  forms.forEach(f=>{
-    if(!/csrf|token/i.test(f[0]))
-      issues.push("Form without CSRF token");
-  });
-  return issues;
-}
-function detectCMSVersion(body){
-  const v=[];
-  const wp = body.match(/wp-content\/themes\/[^\/]+\/style\.css.*?Version:\s*([0-9.]+)/i);
-  if(wp) v.push(`WordPress: ${wp[1]}`);
-  const joomla = body.match(/content="Joomla! - Open Source Content Management".*?version\s*([0-9.]+)/i);
-  if(joomla) v.push(`Joomla: ${joomla[1]}`);
-  const drupal = body.match(/name="Generator" content="Drupal ([0-9.]+)"/i);
-  if(drupal) v.push(`Drupal: ${drupal[1]}`);
-  return v;
-}
-function owaspMap(r){
-  const map=[];
-  if(r.sqli?.length) map.push("A03: Injection (indicator)");
-  if(r.xss?.length) map.push("A03: Injection (XSS indicator)");
-  if(r.rce?.length) map.push("A01: Broken Access Control (RCE indicator)");
-  if(r.headers?.some(h=>!h.ok)) map.push("A05: Security Misconfiguration");
-  if(r.forms?.length) map.push("A08: CSRF (signal)");
-  return [...new Set(map)];
-}
 function risk(r){
   let s=0;
   if(!r.http.https) s+=20;
   if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
-  if(r.tech.includes("WordPress")) s+=5;
   if(r.waf.level==="High") s+=10;
-  if(r.xss.length) s+=10;
-  if(r.sqli.length) s+=10;
-  if(r.rce.length) s+=10;
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
 
@@ -468,22 +349,14 @@ async function runScan(domain){
   try{
     const r = {};
     r.http = await scanHTTP(domain);
-    setProgress(20);
-    r.tech = techFingerprint(r.http);
+    setProgress(30);
     r.headers = scanHeaders(r.http.headers);
-    setProgress(35);
+    setProgress(45);
     r.dns = await scanDNS(domain);
-    setProgress(50);
+    setProgress(60);
     r.ports = await scanPorts(domain);
-    setProgress(70);
+    setProgress(80);
     r.waf = detectWAF(r.http.headers, r.http.body);
-    r.xss = xssIndicators(r.http);
-    r.sqli = sqliIndicators(r.http);
-    r.rce = rceIndicators(r.http);
-    r.forms = formIssues(r.http.body);
-    r.owasp = owaspMap(r);
-    r.version = detectCMSVersion(r.http.body);
-    setProgress(90);
     r.risk = risk(r);
     setProgress(100);
 
@@ -495,15 +368,10 @@ ${section("HTTP", `
 Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}
 HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}
 `)}
-${section("Tech", r.tech.join(", ")||"None")}
-${section("CMS Version", r.version.join("<br>")||"None")}
 ${section("Security Headers", r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))}
 ${section("WAF", `Detected: ${r.waf.vendors.join(", ")||"None"}<br>Protection: ${r.waf.level}`)}
-${section("XSS Indicators", r.xss.join("<br>")||"None")}
-${section("SQLi Indicators", r.sqli.join("<br>")||"None")}
-${section("RCE Indicators", r.rce.join("<br>")||"None")}
-${section("Form Issues", r.forms.join("<br>")||"None")}
-${section("OWASP Mapping", r.owasp.join("<br>")||"None")}
+${section("DNS", Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))}
+${section("Ports", Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"))}
 ${section("Risk", `Level: ${r.risk.level}<br>Score: ${r.risk.score}`)}
 `;
     document.getElementById("scanOut").innerHTML = `<pre>${out}</pre>`;
@@ -594,16 +462,6 @@ document.getElementById("btnScan").addEventListener("click", ()=>{
   runScan(domain);
 });
 document.getElementById("scanBtn").addEventListener("click", ()=>{
-  const domain = clean(document.getElementById("scanTarget").value);
-  if(!domain){ setStatus("Target required."); return; }
-  runScan(domain);
-});
-document.getElementById("btnScanQuick").addEventListener("click", ()=>{
-  const domain = clean(document.getElementById("scanTarget").value);
-  if(!domain){ setStatus("Target required."); return; }
-  runScan(domain);
-});
-document.getElementById("btnScanDeep").addEventListener("click", ()=>{
   const domain = clean(document.getElementById("scanTarget").value);
   if(!domain){ setStatus("Target required."); return; }
   runScan(domain);
