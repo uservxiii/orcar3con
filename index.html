@@ -36,7 +36,7 @@ body{
   border-radius:18px;
   padding:20px;
   border:1px solid var(--border);
-  box-shadow:var(--shadow)
+  box-shadow:var(--shadow);
 }
 h1{text-align:center;color:var(--navy);margin:0 0 14px}
 .row{display:flex;gap:12px;align-items:center}
@@ -58,37 +58,26 @@ button{
   background:var(--navy);
   color:#fff;
   cursor:pointer;
-  transition: transform .1s ease;
 }
-button:hover{transform:translateY(-1px)}
-button:active{transform:translateY(0)}
 pre{
   background:#f7f9ff;
   padding:15px;
   border-radius:12px;
   overflow:auto;
   white-space:pre-wrap;
-  color:var(--navy)
+  color:var(--navy);
 }
 [data-theme="dark"] pre{background:#0f172a;color:#e9efff}
 .badge{display:inline-block;padding:4px 8px;border-radius:8px;font-size:12px;margin-left:6px}
 .ok{background:#d4f8e8;color:var(--ok)}
 .warn{background:#fff4cc;color:var(--warn)}
 .err{background:#ffd6d6;color:var(--err)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .section{border:1px solid var(--border);padding:14px;border-radius:14px;background:var(--white)}
 [data-theme="dark"] .section{background:#0f172a;border-color:#1b2436}
 .section h2{margin:0 0 10px 0;font-size:16px;color:var(--navy)}
 .small{color:#666;font-size:13px}
 .progress{height:10px;background:#e9edf7;border-radius:8px;overflow:hidden;margin:10px 0 14px}
 .progress>div{height:100%;width:0;background:var(--navy)}
-.loader{
-  width:14px;height:14px;border:2px solid var(--navy);
-  border-top-color:transparent;border-radius:50%;
-  animation:spin .7s linear infinite;
-  display:inline-block;vertical-align:middle;margin-right:8px;
-}
-@keyframes spin{to{transform:rotate(360deg)}}
 .log{
   background:#f7f9ff;
   border:1px solid var(--border);
@@ -102,8 +91,6 @@ pre{
 .btn-row{display:flex;gap:10px;flex-wrap:wrap}
 .footer{margin-top:14px;font-size:13px;color:#666;text-align:center}
 [data-theme="dark"] .footer{color:#b8c3d7}
-.kbd{display:inline-block;padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:#f0f2ff;font-size:12px}
-[data-theme="dark"] .kbd{background:#1b2436}
 </style>
 </head>
 <body>
@@ -114,68 +101,65 @@ pre{
 
     <div class="row">
       <input id="target" placeholder="domain.com" autofocus>
-      <button id="scanBtn" onclick="run()">Scan</button>
-      <button onclick="toggleTheme()">Theme</button>
-      <button onclick="exportReport()">Export</button>
+      <button id="scanBtn">Scan</button>
+      <button id="themeBtn">Theme</button>
+      <button id="exportBtn">Export</button>
     </div>
 
     <div class="progress"><div id="bar"></div></div>
 
-    <div class="row">
-      <div class="log" id="statusLog"></div>
-    </div>
+    <div class="log" id="statusLog"></div>
 
     <div id="output" class="section"></div>
     <div id="details" class="section"></div>
 
-    <div class="grid">
-      <div class="section">
-        <h2>LAB</h2>
-        <input id="labEndpoint" placeholder="/search?q=">
-        <select id="labMethod"><option>GET</option><option>POST</option></select>
-        <textarea id="labPayload" placeholder="payload"></textarea>
-        <div class="btn-row">
-          <button onclick="labTest()">Run</button>
-          <button onclick="validateXSSReflected()">XSS Reflected</button>
-          <button onclick="validateXSSStored()">XSS Stored</button>
-          <button onclick="validateSQLiTimeBased()">SQLi Time</button>
-          <button onclick="validateRCE()">RCE</button>
-          <button onclick="wafToleranceTest()">WAF Test</button>
-          <button onclick="phpunitChecker()">PHPUnit</button>
-          <button onclick="configExposure()">Config Check</button>
-          <button onclick="csrfChecker()">CSRF Check</button>
-          <button onclick="wpPluginThemeDetect()">WP Plugins/Themes</button>
-        </div>
-        <pre id="labOut"></pre>
+    <div class="section">
+      <h2>LAB</h2>
+      <input id="labEndpoint" placeholder="/search?q=">
+      <select id="labMethod"><option>GET</option><option>POST</option></select>
+      <textarea id="labPayload" placeholder="payload"></textarea>
+      <div class="btn-row">
+        <button id="labRunBtn">Run</button>
+        <button id="xssRefBtn">XSS Reflected</button>
+        <button id="xssStoredBtn">XSS Stored</button>
+        <button id="sqliBtn">SQLi Time</button>
+        <button id="rceBtn">RCE</button>
+        <button id="wafBtn">WAF Test</button>
+        <button id="phpunitBtn">PHPUnit</button>
+        <button id="configBtn">Config Check</button>
+        <button id="csrfBtn">CSRF Check</button>
+        <button id="wpBtn">WP Plugins/Themes</button>
       </div>
+      <pre id="labOut"></pre>
+    </div>
 
-      <div class="section">
-        <h2>Bruteforce</h2>
-        <input type="file" id="adminWordlistFile">
-        <input type="file" id="dirWordlistFile">
-        <input type="file" id="subWordlistFile">
-        <div class="btn-row">
-          <button onclick="adminBrute()">Admin</button>
-          <button onclick="pauseBrute('admin')">Pause Admin</button>
-          <button onclick="resumeBrute('admin')">Resume Admin</button>
-          <button onclick="dirBrute()">Dir</button>
-          <button onclick="pauseBrute('dir')">Pause Dir</button>
-          <button onclick="resumeBrute('dir')">Resume Dir</button>
-          <button onclick="subdomainBrute()">Sub</button>
-          <button onclick="pauseBrute('sub')">Pause Sub</button>
-          <button onclick="resumeBrute('sub')">Resume Sub</button>
-        </div>
-        <pre id="adminOut"></pre>
-        <pre id="dirOut"></pre>
-        <pre id="subOut"></pre>
+    <div class="section">
+      <h2>Bruteforce</h2>
+      <input type="file" id="adminWordlistFile">
+      <input type="file" id="dirWordlistFile">
+      <input type="file" id="subWordlistFile">
+      <div class="btn-row">
+        <button id="adminBtn">Admin</button>
+        <button id="pauseAdminBtn">Pause Admin</button>
+        <button id="resumeAdminBtn">Resume Admin</button>
+        <button id="dirBtn">Dir</button>
+        <button id="pauseDirBtn">Pause Dir</button>
+        <button id="resumeDirBtn">Resume Dir</button>
+        <button id="subBtn">Sub</button>
+        <button id="pauseSubBtn">Pause Sub</button>
+        <button id="resumeSubBtn">Resume Sub</button>
       </div>
+      <pre id="adminOut"></pre>
+      <pre id="dirOut"></pre>
+      <pre id="subOut"></pre>
     </div>
 
     <div class="section">
       <h2>Scan History</h2>
-      <button onclick="clearHistory()">Clear</button>
+      <button id="clearHistoryBtn">Clear</button>
       <pre id="historyOut"></pre>
     </div>
+
   </div>
 </div>
 
@@ -183,86 +167,72 @@ pre{
 const PROXY="https://r.jina.ai/http://";
 const ports=[80,443,8080,8443];
 const headersCheck=["content-security-policy","strict-transport-security","x-frame-options","x-content-type-options","referrer-policy","permissions-policy"];
+
 let lastReport=null;
 let bruteState={
   admin:{running:false,index:0,list:[],found:[],delay:200},
-  sub:{running:false,index:0,list:[],found:[],delay:200},
-  dir:{running:false,index:0,list:[],found:[],delay:200}
+  dir:{running:false,index:0,list:[],found:[],delay:200},
+  sub:{running:false,index:0,list:[],found:[],delay:200}
 };
-const dom={
+
+const el={
   bar:()=>document.getElementById("bar"),
   output:()=>document.getElementById("output"),
   details:()=>document.getElementById("details"),
   statusLog:()=>document.getElementById("statusLog"),
-  historyOut:()=>document.getElementById("historyOut")
+  history:()=>document.getElementById("historyOut"),
+  labOut:()=>document.getElementById("labOut"),
 };
-function logStatus(msg){
-  const log=dom.statusLog();
-  log.textContent = `${new Date().toLocaleTimeString()} - ${msg}\n` + log.textContent;
+
+function log(msg){
+  const l=el.statusLog();
+  l.textContent=`${new Date().toLocaleTimeString()} - ${msg}\n`+l.textContent;
 }
 function clean(d){ return d.trim().replace(/^https?:\/\//,'').replace(/\/+$/,''); }
-function setProgress(p){ dom.bar().style.width=p+"%"; }
-function badge(txt,cls){ return `<span class="badge ${cls}">${txt}</span>`; }
-function section(title,html){ return `<h2>${title}</h2>${html}`; }
+function setProgress(p){ el.bar().style.width=p+"%"; }
+function badge(t,c){ return `<span class="badge ${c}">${t}</span>`; }
+function section(t,h){ return `<h2>${t}</h2>${h}`; }
+
 async function timeoutFetch(url,ms=8000){
   const c=new AbortController();
   setTimeout(()=>c.abort(),ms);
   return fetch(url,{signal:c.signal});
 }
-function buildUrl(domain,ep,payload,method){
-  const base=PROXY+"http://"+domain;
-  if(method==="GET"){
-    const sep=ep.includes("?")?"&":"?";
-    return base+ep+sep+encodeURIComponent(payload);
-  }
-  return base+ep;
-}
+
 function toggleTheme(){
-  const root=document.documentElement;
-  root.setAttribute("data-theme",root.getAttribute("data-theme")==="dark"?"light":"dark");
+  const r=document.documentElement;
+  r.setAttribute("data-theme", r.getAttribute("data-theme")==="dark"?"light":"dark");
 }
-function saveHistory(report){
+
+function saveHistory(r){
   const h=JSON.parse(localStorage.getItem("orca_history")||"[]");
-  h.unshift({time:new Date().toISOString(),report});
+  h.unshift({time:new Date().toISOString(),report:r});
   localStorage.setItem("orca_history",JSON.stringify(h.slice(0,20)));
   renderHistory();
 }
+
 function renderHistory(){
   const h=JSON.parse(localStorage.getItem("orca_history")||"[]");
-  dom.historyOut().textContent=h.length? h.map(x=>`${x.time}\n${JSON.stringify(x.report,null,2)}`).join("\n\n"):"No history yet.";
+  el.history().textContent=h.length? h.map(x=>`${x.time}\n${JSON.stringify(x.report,null,2)}`).join("\n\n"):"No history";
 }
-function clearHistory(){ localStorage.removeItem("orca_history"); renderHistory(); }
+
+function clearHistory(){
+  localStorage.removeItem("orca_history");
+  renderHistory();
+}
+
 async function scanHTTP(domain){
   const r=await timeoutFetch(PROXY+"http://"+domain);
   const text=await r.text();
-  let headersObj={};
-  r.headers.forEach((v,k)=>headersObj[k]=v);
-  return {status:r.status,url:r.url,headers:headersObj,body:text,https:r.url.startsWith("https")};
+  let h={};
+  r.headers.forEach((v,k)=>h[k]=v);
+  return {status:r.status,url:r.url,headers:h,body:text,https:r.url.startsWith("https")};
 }
-function techFingerprint(http){
-  const tech=[];
-  const body=http.body||"";
-  const server=http.headers["server"]||"";
-  const patterns=[
-    ["WordPress",/wp-content|wp-includes/i],
-    ["Joomla",/Joomla!/i],
-    ["Drupal",/drupal/i],
-    ["Magento",/Magento/i],
-    ["Shopify",/shopify/i],
-    ["Laravel",/laravel/i],
-    ["Express",/express/i],
-    ["Django",/django/i],
-    ["Ruby on Rails",/rails/i],
-    ["Next.js",/next\.js/i],
-    ["React",/react/i],
-    ["Angular",/angular/i]
-  ];
-  patterns.forEach(p=>{
-    if(p[1].test(body)||server.toLowerCase().includes(p[0].toLowerCase())) tech.push(p[0]);
-  });
-  return [...new Set(tech)];
+
+function scanHeaders(headers){
+  return headersCheck.map(x=>({name:x,ok:!!headers[x]}));
 }
-function scanHeaders(h){ return headersCheck.map(x=>({name:x,ok:!!h[x]})); }
+
 async function scanDNS(domain){
   const types=["A","AAAA","MX","NS","TXT"];
   let out={};
@@ -275,24 +245,16 @@ async function scanDNS(domain){
   }
   return out;
 }
-async function subdomains(domain){
-  let list=[];
-  try{
-    const r=await fetch(`https://crt.sh/?q=%25.${domain}&output=json`);
-    const j=await r.json();
-    list=[...new Set(j.map(x=>x.name_value))].slice(0,30);
-  }catch{}
-  const common=["www","mail","api","dev","staging","test","admin","portal","blog","shop"];
-  common.forEach(s=>list.push(`${s}.${domain}`));
-  return [...new Set(list)].slice(0,40);
-}
+
 async function scanPorts(domain){
   let res={};
   for(const p of ports){
-    try{await timeoutFetch(`http://${domain}:${p}`,3000);res[p]=true;}catch{res[p]=false;}
+    try{ await timeoutFetch(`http://${domain}:${p}`,3000); res[p]=true; }
+    catch{ res[p]=false; }
   }
   return res;
 }
+
 function detectWAF(headers,body){
   const waf=[];
   const h=(k)=>(headers[k]||"").toLowerCase();
@@ -306,263 +268,223 @@ function detectWAF(headers,body){
   if(waf.length){ level=waf.some(x=>["Cloudflare","Akamai","Imperva"].includes(x))?"High":"Medium"; }
   return {vendors:[...new Set(waf)],level};
 }
+
 function xssIndicators(http){
   const issues=[];
   const h=http.headers;
   const body=http.body||"";
   if(!h["content-security-policy"]) issues.push("Missing CSP");
-  if(/<script[\s>]/i.test(body)) issues.push("Inline <script> present");
-  if(/innerHTML\s*=|document\.write|eval\(/i.test(body)) issues.push("DOM XSS sink pattern");
-  if(!h["x-xss-protection"]) issues.push("X-XSS-Protection missing (legacy)");
+  if(/<script[\s>]/i.test(body)) issues.push("Inline <script> found");
+  if(/innerHTML\s*=|document\.write|eval\(/i.test(body)) issues.push("Potential DOM XSS pattern");
+  if(!h["x-xss-protection"]) issues.push("Missing X-XSS-Protection");
   return issues;
 }
+
 function sqliIndicators(http){
   const issues=[];
   const body=http.body||"";
   const err=[/sql syntax/i,/mysql_fetch|mysqli_/i,/ORA-\d+/i,/ODBC SQL Server/i,/Unclosed quotation mark/i,/SQLite\/JDBC/i,/syntax error at or near/i];
-  if(err.some(r=>r.test(body))) issues.push("SQL error pattern in response");
+  if(err.some(r=>r.test(body))) issues.push("SQL error pattern");
   const url=http.url||"";
   if(url.includes("?")){
     const params=url.split("?")[1];
-    if(/('|%27|--|;|or%20|and%20)/i.test(params)) issues.push("Suspicious SQL chars in URL parameters");
+    if(/('|%27|--|;|or%20|and%20)/i.test(params)) issues.push("Suspicious SQL chars in URL");
   }
   return issues;
 }
+
 function rceIndicators(http){
   const issues=[];
   const body=http.body||"";
   const patterns=[/command not found/i,/popen\(/i,/exec\(/i,/system\(/i,/shell_exec\(/i,/Permission denied/i,/cannot execute/i];
-  if(patterns.some(r=>r.test(body))) issues.push("Command execution error pattern in response");
-  if(http.url.includes("cmd=")||http.url.includes("exec=")||http.url.includes("command=")) issues.push("Command-like parameter name detected");
+  if(patterns.some(r=>r.test(body))) issues.push("Command execution error pattern");
+  if(http.url.includes("cmd=")||http.url.includes("exec=")||http.url.includes("command=")) issues.push("Command-like parameter found");
   return issues;
 }
+
 function formIssues(body){
   const issues=[];
   const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
   forms.forEach(f=>{ if(!/csrf|token/i.test(f[0])) issues.push("Form without CSRF token"); });
   return issues;
 }
-const adminPaths=["/wp-admin/","/administrator/","/user/login","/admin","/login","/admin/login","/admin.php","/adminarea","/adminpanel","/useradmin","/cpanel","/manager/html","/admin/login.php","/admin/index.php","/user","/admin/dashboard","/admin/home","/backend","/adminpanel.php","/wp-login.php","/wp-admin.php"];
-async function detectAdmin(domain){
-  const found=[];
-  for(const p of adminPaths){
-    try{
-      const r=await timeoutFetch(PROXY+"http://"+domain+p,4000);
-      const t=await r.text();
-      if(r.status===200&&(t.toLowerCase().includes("login")||t.toLowerCase().includes("password"))) found.push(p);
-    }catch{}
-  }
-  return [...new Set(found)];
-}
-async function detectCMSAdmin(domain){
-  const checks=[{name:"WordPress",path:"/wp-login.php"},{name:"Joomla",path:"/administrator/"},{name:"Drupal",path:"/user/login"}];
-  let found=[];
-  for(const c of checks){
-    try{
-      const r=await timeoutFetch(PROXY+"http://"+domain+c.path,5000);
-      const t=await r.text();
-      const ok=r.status===200&&(t.toLowerCase().includes("login")||t.toLowerCase().includes("password")||t.toLowerCase().includes("wp-"));
-      if(ok) found.push(`${c.name} => ${c.path}`);
-    }catch{}
-  }
-  return found;
-}
-function detectCMSVersion(body){
-  const v=[];
-  const wp=body.match(/wp-content\/themes\/[^\/]+\/style\.css.*?Version:\s*([0-9.]+)/i);
-  if(wp) v.push(`WordPress: ${wp[1]}`);
-  const joomla=body.match(/content="Joomla! - Open Source Content Management".*?version\s*([0-9.]+)/i);
-  if(joomla) v.push(`Joomla: ${joomla[1]}`);
-  const drupal=body.match(/name="Generator" content="Drupal ([0-9.]+)"/i);
-  if(drupal) v.push(`Drupal: ${drupal[1]}`);
-  return v;
-}
-function owaspMap(r){
-  const map=[];
-  if(r.sqli?.length) map.push("A03: Injection (indicator)");
-  if(r.xss?.length) map.push("A03: Injection (XSS indicator)");
-  if(r.rce?.length) map.push("A01: Broken Access Control (RCE indicator)");
-  if(r.headers?.some(h=>!h.ok)) map.push("A05: Security Misconfiguration");
-  if(r.forms?.length) map.push("A08: CSRF (signal)");
-  return [...new Set(map)];
-}
+
 function risk(r){
   let s=0;
   if(!r.http.https) s+=20;
   if(!r.headers.find(x=>x.name==="content-security-policy"&&x.ok)) s+=10;
-  if(r.tech.includes("WordPress")) s+=5;
   if(r.waf.level==="High") s+=10;
   if(r.xss.length) s+=10;
   if(r.sqli.length) s+=10;
   if(r.rce.length) s+=10;
   return {score:s,level:s<20?"Low":s<40?"Medium":"High"};
 }
+
 async function run(){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ logStatus("No target provided."); return; }
-  logStatus("Scan started");
+  if(!domain){ log("No target"); return; }
+  log("Scan started");
   setProgress(5);
-  dom.output().innerHTML="<b>Scanning...</b>";
+  el.output().innerHTML="<b>Scanning...</b>";
+
   let r={};
   try{
     r.http=await scanHTTP(domain);
-    logStatus("HTTP scan done");
+    log("HTTP scan done");
     setProgress(20);
-    r.tech=techFingerprint(r.http);
+
     r.headers=scanHeaders(r.http.headers);
-    setProgress(30);
     r.dns=await scanDNS(domain);
-    logStatus("DNS scan done");
+    log("DNS scan done");
     setProgress(40);
-    r.subdomains=await subdomains(domain);
-    setProgress(55);
+
     r.ports=await scanPorts(domain);
-    logStatus("Port scan done");
-    setProgress(70);
+    log("Port scan done");
+    setProgress(60);
+
     r.waf=detectWAF(r.http.headers,r.http.body);
     r.xss=xssIndicators(r.http);
     r.sqli=sqliIndicators(r.http);
     r.rce=rceIndicators(r.http);
     r.forms=formIssues(r.http.body);
-    r.owasp=owaspMap(r);
-    r.version=detectCMSVersion(r.http.body);
-    setProgress(80);
-    r.admin=await detectAdmin(domain);
-    r.cmsAdmin=await detectCMSAdmin(domain);
-    setProgress(90);
     r.risk=risk(r);
-    setProgress(100);
+    setProgress(80);
+
     lastReport=r;
     saveHistory(r);
-    logStatus("Scan completed");
+    setProgress(100);
+    log("Scan finished");
+
+    el.output().innerHTML=
+      section("HTTP",`Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}<br>HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}`)+
+      section("Security Headers",r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))+
+      section("WAF",`Detected: ${r.waf.vendors.join(", ")||"None"}<br>Protection: ${r.waf.level}`)+
+      section("XSS",r.xss.join("<br>")||"None")+
+      section("SQLi",r.sqli.join("<br>")||"None")+
+      section("RCE",r.rce.join("<br>")||"None")+
+      section("Forms",r.forms.join("<br>")||"None")+
+      section("Risk",`Level: ${r.risk.level} Score: ${r.risk.score}`);
+
+    el.details().innerHTML=
+      section("DNS",Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))+
+      section("Ports",Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"));
   }catch{
-    dom.output().innerHTML="<b>Scan failed.</b>";
+    el.output().innerHTML="<b>Scan failed</b>";
     setProgress(0);
-    logStatus("Scan failed");
-    return;
+    log("Scan failed");
   }
-  dom.output().innerHTML=
-    section("HTTP",`Status: ${r.http.status} ${r.http.status===200?badge("OK","ok"):badge("BAD","err")}<br>HTTPS: ${r.http.https?badge("YES","ok"):badge("NO","warn")}`)+
-    section("Tech",r.tech.join(", ")||"None")+
-    section("CMS Version",r.version.join("<br>")||"None")+
-    section("Security Headers",r.headers.map(h=>`${h.name}: ${h.ok?badge("OK","ok"):badge("MISSING","warn")}`).join("<br>"))+
-    section("WAF",`Detected: ${r.waf.vendors.join(", ")||"None"}<br>Protection: ${r.waf.level}`)+
-    section("XSS Indicators",r.xss.join("<br>")||"None")+
-    section("SQLi Indicators",r.sqli.join("<br>")||"None")+
-    section("RCE Indicators",r.rce.join("<br>")||"None")+
-    section("Form Issues",r.forms.join("<br>")||"None")+
-    section("OWASP Mapping",r.owasp.join("<br>")||"None")+
-    section("Admin Login Paths",r.admin.join("<br>")||"None")+
-    section("CMS Admin Fingerprint",r.cmsAdmin.join("<br>")||"None");
-  dom.details().innerHTML=
-    section("DNS",Object.entries(r.dns).map(([k,v])=>`${k}: ${v.join(", ")||"None"}`).join("<br>"))+
-    section("Subdomains",r.subdomains.join("<br>")||"None")+
-    section("Ports",Object.entries(r.ports).map(([p,o])=>`${p}: ${o?"Open":"Closed"}`).join("<br>"))+
-    section("Risk",`Level: ${r.risk.level}<br>Score: ${r.risk.score}`);
 }
-document.addEventListener("DOMContentLoaded",()=>{
-  const target=document.getElementById("target");
-  target.focus();
-  target.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); run(); } });
-  renderHistory();
-});
-function exportReport(){
-  if(!lastReport){ alert("No report to export yet."); return; }
-  const blob=new Blob([JSON.stringify(lastReport,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download="orca_report.json";
-  a.click();
-  URL.revokeObjectURL(url);
+
+function buildUrl(domain,ep,payload,method){
+  const base=PROXY+"http://"+domain;
+  if(method==="GET"){
+    const sep=ep.includes("?")?"&":"?";
+    return base+ep+sep+encodeURIComponent(payload);
+  }
+  return base+ep;
 }
-async function labTest(){
+
+async function labRun(){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("labOut").textContent="Enter target domain first."; return; }
   const ep=document.getElementById("labEndpoint").value.trim();
   const method=document.getElementById("labMethod").value;
   const payload=document.getElementById("labPayload").value.trim();
-  if(!ep||!payload){ document.getElementById("labOut").textContent="Endpoint and payload required."; return; }
+  if(!domain||!ep){ el.labOut().textContent="Target + endpoint required"; return; }
   const url=buildUrl(domain,ep,payload,method);
   try{
-    let res=await timeoutFetch(url,8000);
-    let text=await res.text();
-    document.getElementById("labOut").textContent=`Status: ${res.status}\nURL: ${res.url}\nResponse snippet:\n${text.slice(0,500)}`;
-  }catch{ document.getElementById("labOut").textContent="Lab request failed (CORS/proxy/timeout)."; }
+    const r=await timeoutFetch(url,8000);
+    const text=await r.text();
+    el.labOut().textContent=`Status:${r.status}\nURL:${r.url}\nSnippet:\n${text.slice(0,400)}`;
+  }catch{ el.labOut().textContent="Lab request failed"; }
 }
-function uniqueToken(){ return "ORCA_"+Math.random().toString(36).substring(2,10).toUpperCase(); }
-async function validateRCE(){
+
+async function xssReflected(){
   const domain=clean(document.getElementById("target").value);
   const ep=document.getElementById("labEndpoint").value.trim();
-  const method=document.getElementById("labMethod").value;
-  if(!domain||!ep){ document.getElementById("labOut").textContent="Target + endpoint required for validation."; return; }
-  const token=uniqueToken();
-  const payload=`echo ${token}`;
-  const url=buildUrl(domain,ep,payload,method);
+  if(!domain||!ep){ el.labOut().textContent="Target + endpoint required"; return; }
+  const payload="<svg/onload=alert(1)>";
+  const url=buildUrl(domain,ep,payload,"GET");
   try{
-    let res=await timeoutFetch(url,8000);
-    let text=await res.text();
-    const ok=text.includes(token);
-    document.getElementById("labOut").textContent=`VALIDATION RESULT: ${ok?"VALID (RCE confirmed)":"NOT VALID (no output)"}\nToken: ${token}\nResponse snippet:\n${text.slice(0,500)}`;
-  }catch{ document.getElementById("labOut").textContent="Validation failed (CORS/proxy/timeout)."; }
+    const r=await timeoutFetch(url,8000);
+    const text=await r.text();
+    el.labOut().textContent=`Reflected XSS Test\nReflected:${text.includes(payload)?"YES":"NO"}\nStatus:${r.status}\nSnippet:\n${text.slice(0,200)}`;
+  }catch{ el.labOut().textContent="Test failed"; }
 }
-async function validateSQLiTimeBased(){
+
+async function xssStored(){
   const domain=clean(document.getElementById("target").value);
   const ep=document.getElementById("labEndpoint").value.trim();
-  if(!domain||!ep){ document.getElementById("labOut").textContent="Target + endpoint required."; return; }
+  if(!domain||!ep){ el.labOut().textContent="Target + endpoint required"; return; }
+  const payload="test_payload";
+  try{
+    const r=await fetch(PROXY+"http://"+domain+ep,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"input="+encodeURIComponent(payload)});
+    const text=await r.text();
+    el.labOut().textContent=`Stored XSS (POST)\nStatus:${r.status}\nSnippet:\n${text.slice(0,200)}\n\nNote: need to check if payload appears elsewhere.`;
+  }catch{ el.labOut().textContent="Test failed"; }
+}
+
+async function sqliTime(){
+  const domain=clean(document.getElementById("target").value);
+  const ep=document.getElementById("labEndpoint").value.trim();
+  if(!domain||!ep){ el.labOut().textContent="Target + endpoint required"; return; }
   const payload="' OR SLEEP(5) -- ";
   const url=buildUrl(domain,ep,payload,"GET");
   const start=performance.now();
   try{
     await timeoutFetch(url,10000);
     const end=performance.now();
-    const diff=end-start;
-    const isSlow=diff>4500;
-    document.getElementById("labOut").textContent=`Time-based SQLi Test:\nResponse Time: ${Math.round(diff)}ms\nResult: ${isSlow?"POSSIBLE SQLi (time delay detected)":"NOT DETECTED"}`;
-  }catch{ document.getElementById("labOut").textContent="timeout/CORS/proxy"; }
+    const diff=Math.round(end-start);
+    el.labOut().textContent=`SQLi Time Test\nTime:${diff}ms\nResult:${diff>4500?"POSSIBLE":"NOT DETECTED"}`;
+  }catch{ el.labOut().textContent="Test failed"; }
 }
-async function validateXSSReflected(){
+
+async function rceTest(){
   const domain=clean(document.getElementById("target").value);
   const ep=document.getElementById("labEndpoint").value.trim();
-  if(!domain||!ep){ document.getElementById("labOut").textContent="Target + endpoint required."; return; }
-  const payload="<svg/onload=alert(1)>";
+  if(!domain||!ep){ el.labOut().textContent="Target + endpoint required"; return; }
+  const token="ORCA_"+Math.random().toString(36).slice(2,10);
+  const payload="echo "+token;
   const url=buildUrl(domain,ep,payload,"GET");
   try{
-    const res=await timeoutFetch(url,8000);
-    const text=await res.text();
-    const reflected=text.includes(payload);
-    document.getElementById("labOut").textContent=`Reflected XSS Test:\nStatus: ${res.status}\nReflected: ${reflected?"YES":"NO"}\nResponse snippet:\n${text.slice(0,200)}`;
-  }catch{ document.getElementById("labOut").textContent="timeout/CORS/proxy"; }
+    const r=await timeoutFetch(url,8000);
+    const text=await r.text();
+    el.labOut().textContent=`RCE Test\nToken:${token}\nResult:${text.includes(token)?"VALID":"NOT VALID"}\nSnippet:\n${text.slice(0,200)}`;
+  }catch{ el.labOut().textContent="Test failed"; }
 }
-async function validateXSSStored(){
+
+async function wafTest(){
   const domain=clean(document.getElementById("target").value);
-  const ep=document.getElementById("labEndpoint").value.trim();
-  if(!domain||!ep){ document.getElementById("labOut").textContent="Target + endpoint required."; return; }
-  const token="<svg/onload=alert(1)>";
-  const url=PROXY+"http://"+domain+ep;
-  try{
-    const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"input="+encodeURIComponent(token)});
-    const text=await res.text();
-    document.getElementById("labOut").textContent=`Stored XSS Test (POST):\nStatus: ${res.status}\nPayload sent.\nResponse snippet:\n${text.slice(0,200)}\n\nNOTE: Stored XSS requires checking later if payload appears in another page.`;
-  }catch{ document.getElementById("labOut").textContent="timeout/CORS/proxy"; }
+  if(!domain){ el.labOut().textContent="Target required"; return; }
+  const payloads=["<script>alert(1)</script>","' OR '1'='1","../../../../etc/passwd","UNION SELECT NULL"];
+  let out=[];
+  for(const p of payloads){
+    const url=PROXY+"http://"+domain+"/?q="+encodeURIComponent(p);
+    try{
+      const r=await timeoutFetch(url,8000);
+      out.push(`${p} => ${r.status}`);
+    }catch{ out.push(`${p} => failed`); }
+  }
+  el.labOut().textContent="WAF Test\n"+out.join("\n");
 }
-async function phpunitChecker(){
+
+async function phpunitCheck(){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("labOut").textContent="Target required."; return; }
+  if(!domain){ el.labOut().textContent="Target required"; return; }
   const endpoints=["/phpunit/phpunit.xml","/vendor/phpunit/phpunit/phpunit.xml","/phpunit.xml","/phpunit/phpunit.xml.dist"];
   let found=[];
   for(const ep of endpoints){
     try{
       const r=await timeoutFetch(PROXY+"http://"+domain+ep,5000);
       const t=await r.text();
-      if(r.status===200&&t.includes("<phpunit")) found.push(ep);
+      if(r.status===200 && t.includes("<phpunit")) found.push(ep);
     }catch{}
   }
-  document.getElementById("labOut").textContent=`PHPUnit Exposure Check:\nFound: ${found.length?found.join(", "):"None"}\nNote: This is lab-only check.`;
+  el.labOut().textContent="PHPUnit Check\nFound: "+(found.length?found.join(", "):"None");
 }
-async function configExposure(){
+
+async function configCheck(){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("labOut").textContent="Target required."; return; }
+  if(!domain){ el.labOut().textContent="Target required"; return; }
   const files=["/.env","/config.php","/wp-config.php","/configuration.php","/settings.php","/.htpasswd","/.git/config"];
   let found=[];
   for(const f of files){
@@ -571,151 +493,169 @@ async function configExposure(){
       if(r.status===200) found.push(f);
     }catch{}
   }
-  document.getElementById("labOut").textContent=`Config Exposure Check:\nFound: ${found.length?found.join(", "):"None"}\nNote: Lab-only check.`;
+  el.labOut().textContent="Config Exposure\nFound: "+(found.length?found.join(", "):"None");
 }
-function csrfChecker(){
+
+function csrfCheck(){
   const body=lastReport?.http?.body||"";
+  if(!body){ el.labOut().textContent="No scan data yet"; return; }
   const forms=[...body.matchAll(/<form[\s\S]*?<\/form>/gi)];
-  if(!forms.length){ document.getElementById("labOut").textContent="No forms found on homepage."; return; }
+  if(!forms.length){ el.labOut().textContent="No forms found"; return; }
   let issues=[];
-  forms.forEach((f,idx)=>{ const hasCSRF=/csrf|token|_csrf|csrf_token/i.test(f[0]); if(!hasCSRF) issues.push(`Form ${idx+1}: MISSING CSRF token`); });
-  document.getElementById("labOut").textContent=`CSRF Token Checker:\n${issues.length?issues.join("\n"):"All forms contain CSRF token (or token-like field)."}\n(Note: token detection is heuristic-based.)`;
+  forms.forEach((f,i)=>{ if(!/csrf|token/i.test(f[0])) issues.push("Form "+(i+1)+" missing CSRF"); });
+  el.labOut().textContent="CSRF Check\n"+(issues.length?issues.join("\n"):"No issues detected");
 }
-async function wafToleranceTest(){
+
+async function wpDetect(){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("labOut").textContent="Target required."; return; }
-  const ep="/";
-  const payloads=["' OR '1'='1","<script>alert(1)</script>","UNION SELECT NULL","../../../../etc/passwd"];
-  let results=[];
-  for(const p of payloads){
-    const url=PROXY+"http://"+domain+ep+"?test="+encodeURIComponent(p);
-    try{
-      const start=performance.now();
-      const r=await timeoutFetch(url,8000);
-      const end=performance.now();
-      const time=Math.round(end-start);
-      const blocked=r.status===403||r.status===406||r.status===429;
-      results.push(`${p} => status:${r.status} time:${time}ms blocked:${blocked?"YES":"NO"}`);
-    }catch{ results.push(`${p} => request failed`); }
-  }
-  document.getElementById("labOut").textContent=`WAF Tolerance Test (SAFE):\n`+results.join("\n");
+  if(!domain){ el.labOut().textContent="Target required"; return; }
+  try{
+    const r=await timeoutFetch(PROXY+"http://"+domain,8000);
+    const body=await r.text();
+    const plugins=[...body.matchAll(/wp-content\/plugins\/([^\/]+)\//gi)].map(x=>x[1]);
+    const themes=[...body.matchAll(/wp-content\/themes\/([^\/]+)\//gi)].map(x=>x[1]);
+    el.labOut().textContent="WP Detect\nPlugins: "+([...new Set(plugins)].join(", ")||"None")+"\nThemes: "+([...new Set(themes)].join(", ")||"None");
+  }catch{ el.labOut().textContent="Failed"; }
 }
-async function adminBrute(resume=false){
+
+async function bruteAdmin(resume=false){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("adminOut").textContent="Target required."; return; }
+  if(!domain){ el.adminOut().textContent="Target required"; return; }
   if(!resume){
     bruteState.admin.running=true;
     bruteState.admin.index=0;
     bruteState.admin.found=[];
-    bruteState.admin.list=[];
+    bruteState.admin.list=["admin","administrator","admin/login","admin/index","adminpanel","adminarea","wp-admin","wp-login.php","login","dashboard","backend","portal"];
+    const file=document.getElementById("adminWordlistFile");
+    if(file.files.length){
+      const text=await file.files[0].text();
+      const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
+      bruteState.admin.list=[...new Set([...bruteState.admin.list,...lines])];
+    }
   }
   bruteState.admin.running=true;
-  let list=bruteState.admin.list;
-  if(!list.length){
-    const defaultList=["admin","administrator","admin/login","admin/index","adminpanel","adminarea","cpanel","wp-admin","wp-login.php","administrator/index.php","user/login","login","dashboard","backend","admin1","admin2","manager","login.php","admin.php","admin/login.php","adminpanel.php","adminarea.php","admin/home","admin/dashboard","panel","sysadmin","portal","adminconsole","console","webadmin","siteadmin","wp-admin.php","wp-login.php"];
-    list=[...defaultList];
-    const fileInput=document.getElementById("adminWordlistFile");
-    if(fileInput.files.length){
-      const text=await fileInput.files[0].text();
-      const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
-      list=[...new Set([...list,...lines])];
-    }
-    bruteState.admin.list=list;
-  }
-  while(bruteState.admin.running && bruteState.admin.index<list.length){
-    const p=list[bruteState.admin.index++];
+  while(bruteState.admin.running && bruteState.admin.index<bruteState.admin.list.length){
+    const p=bruteState.admin.list[bruteState.admin.index++];
     try{
       const r=await timeoutFetch(PROXY+"http://"+domain+"/"+p,4000);
       if(r.status===200) bruteState.admin.found.push("/"+p);
     }catch{}
-    document.getElementById("adminOut").textContent=`Admin Brute Result:\nFound: ${bruteState.admin.found.length?bruteState.admin.found.join(", "):"None"}\nChecked: ${bruteState.admin.index}/${list.length}`;
+    el.adminOut().textContent="Admin Brute\nFound: "+(bruteState.admin.found.length?bruteState.admin.found.join(", "):"None")+"\nChecked: "+bruteState.admin.index+"/"+bruteState.admin.list.length;
     await new Promise(r=>setTimeout(r,150));
   }
-  if(!bruteState.admin.running) document.getElementById("adminOut").textContent+="\n\nPaused. Press Resume to continue.";
 }
-async function dirBrute(resume=false){
+
+async function bruteDir(resume=false){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("dirOut").textContent="Target required."; return; }
+  if(!domain){ el.dirOut().textContent="Target required"; return; }
   if(!resume){
-    const speed=prompt("Enter speed (ms delay between requests):","200");
-    bruteState.dir.delay=parseInt(speed)||200;
+    bruteState.dir.running=true;
     bruteState.dir.index=0;
     bruteState.dir.found=[];
-    bruteState.dir.list=[];
+    bruteState.dir.list=["admin","uploads","backup","config","api","old","dev","staging","test","assets","files","tmp","data","wp-admin","wp-login.php"];
+    const file=document.getElementById("dirWordlistFile");
+    if(file.files.length){
+      const text=await file.files[0].text();
+      const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
+      bruteState.dir.list=[...new Set([...bruteState.dir.list,...lines])];
+    }
   }
   bruteState.dir.running=true;
-  let dirs=bruteState.dir.list;
-  if(!dirs.length){
-    const defaultDirs=["admin","administrator","backup","uploads","uploads/images","test","dev","staging","config","api","old","backup2024","wp-admin","wp-login.php","adminpanel","adminarea","cms","private","hidden","assets","files","uploads/backup","tmp","temp","data","db","admin123","adminpanel.php","adminarea.php","admin/login.php","login.php","portal","dashboard"];
-    dirs=[...defaultDirs];
-    const fileInput=document.getElementById("dirWordlistFile");
-    if(fileInput.files.length){
-      const text=await fileInput.files[0].text();
-      const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
-      dirs=[...new Set([...dirs,...lines])];
-    }
-    bruteState.dir.list=dirs;
-  }
-  const delay=bruteState.dir.delay||200;
-  while(bruteState.dir.running && bruteState.dir.index<dirs.length && bruteState.dir.index<500){
-    const d=dirs[bruteState.dir.index++];
+  while(bruteState.dir.running && bruteState.dir.index<bruteState.dir.list.length){
+    const d=bruteState.dir.list[bruteState.dir.index++];
     try{
       const r=await timeoutFetch(PROXY+"http://"+domain+"/"+d,4000);
       if(r.status===200) bruteState.dir.found.push("/"+d);
     }catch{}
-    document.getElementById("dirOut").textContent=`Directory Brute (lab-only):\nFound: ${bruteState.dir.found.length?bruteState.dir.found.join(", "):"None"}\nDelay: ${delay}ms\nChecked: ${bruteState.dir.index}/${Math.min(dirs.length,500)}`;
-    await new Promise(r=>setTimeout(r,delay));
+    el.dirOut().textContent="Dir Brute\nFound: "+(bruteState.dir.found.length?bruteState.dir.found.join(", "):"None")+"\nChecked: "+bruteState.dir.index+"/"+bruteState.dir.list.length;
+    await new Promise(r=>setTimeout(r,200));
   }
-  if(!bruteState.dir.running) document.getElementById("dirOut").textContent+="\n\nPaused. Press Resume to continue.";
 }
-async function subdomainBrute(resume=false){
+
+async function bruteSub(resume=false){
   const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("subOut").textContent="Target required."; return; }
+  if(!domain){ el.subOut().textContent="Target required"; return; }
   if(!resume){
     bruteState.sub.running=true;
     bruteState.sub.index=0;
     bruteState.sub.found=[];
-    bruteState.sub.list=[];
+    bruteState.sub.list=["www","mail","api","dev","staging","test","admin","portal","blog","shop","app","cdn","static","vpn"];
+    const file=document.getElementById("subWordlistFile");
+    if(file.files.length){
+      const text=await file.files[0].text();
+      const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
+      bruteState.sub.list=[...new Set([...bruteState.sub.list,...lines])];
+    }
   }
   bruteState.sub.running=true;
-  let list=bruteState.sub.list;
-  if(!list.length){
-    list=["www","mail","api","dev","staging","test","admin","portal","blog","shop","cdn","static","app","vpn","secure","img","upload","files","backup","beta"];
-    const fileInput=document.getElementById("subWordlistFile");
-    if(fileInput.files.length){
-      const text=await fileInput.files[0].text();
-      const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
-      list=[...new Set([...list,...lines])];
-    }
-    bruteState.sub.list=list;
-  }
-  while(bruteState.sub.running && bruteState.sub.index<list.length && bruteState.sub.index<200){
-    const s=list[bruteState.sub.index++];
+  while(bruteState.sub.running && bruteState.sub.index<bruteState.sub.list.length){
+    const s=bruteState.sub.list[bruteState.sub.index++];
     try{
       const r=await timeoutFetch(PROXY+"http://"+s+"."+domain,3000);
       if(r.status===200) bruteState.sub.found.push(s+"."+domain);
     }catch{}
-    document.getElementById("subOut").textContent=`Subdomain Brute Result:\nFound: ${bruteState.sub.found.length?bruteState.sub.found.join("\n"):"None"}\nChecked: ${bruteState.sub.index}/${Math.min(list.length,200)}`;
+    el.subOut().textContent="Sub Brute\nFound: "+(bruteState.sub.found.length?bruteState.sub.found.join("\n"):"None")+"\nChecked: "+bruteState.sub.index+"/"+bruteState.sub.list.length;
     await new Promise(r=>setTimeout(r,150));
   }
-  if(!bruteState.sub.running) document.getElementById("subOut").textContent+="\n\nPaused. Press Resume to continue.";
 }
-async function wpPluginThemeDetect(){
-  const domain=clean(document.getElementById("target").value);
-  if(!domain){ document.getElementById("subOut").textContent="Target required."; return; }
-  const url=PROXY+"http://"+domain;
-  try{
-    const res=await timeoutFetch(url,8000);
-    const body=await res.text();
-    const plugins=[...body.matchAll(/wp-content\/plugins\/([^\/]+)\//gi)].map(x=>x[1]);
-    const themes=[...body.matchAll(/wp-content\/themes\/([^\/]+)\//gi)].map(x=>x[1]);
-    const puniq=[...new Set(plugins)];
-    const tuniq=[...new Set(themes)];
-    document.getElementById("subOut").textContent=`WP Plugin/Theme Detection:\nPlugins: ${puniq.length?puniq.join(", "):"None"}\nThemes: ${tuniq.length?tuniq.join(", "):"None"}\nNote: Only works if WP assets are exposed in HTML.`;
-  }catch{ document.getElementById("subOut").textContent="Failed (CORS/proxy/timeout)"; }
+
+function pauseBrute(type){
+  bruteState[type].running=false;
 }
-function pauseBrute(type){ bruteState[type].running=false; }
-function resumeBrute(type){ bruteState[type].running=true; if(type==="admin") adminBrute(true); if(type==="sub") subdomainBrute(true); if(type==="dir") dirBrute(true); }
+
+function resumeBrute(type){
+  if(type==="admin") bruteAdmin(true);
+  if(type==="dir") bruteDir(true);
+  if(type==="sub") bruteSub(true);
+}
+
+function exportReport(){
+  if(!lastReport){ alert("No report yet"); return; }
+  const blob=new Blob([JSON.stringify(lastReport,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="orca_report.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener("DOMContentLoaded",()=>{
+  renderHistory();
+
+  document.getElementById("scanBtn").addEventListener("click",run);
+  document.getElementById("themeBtn").addEventListener("click",toggleTheme);
+  document.getElementById("exportBtn").addEventListener("click",exportReport);
+
+  document.getElementById("labRunBtn").addEventListener("click",labRun);
+  document.getElementById("xssRefBtn").addEventListener("click",xssReflected);
+  document.getElementById("xssStoredBtn").addEventListener("click",xssStored);
+  document.getElementById("sqliBtn").addEventListener("click",sqliTime);
+  document.getElementById("rceBtn").addEventListener("click",rceTest);
+  document.getElementById("wafBtn").addEventListener("click",wafTest);
+  document.getElementById("phpunitBtn").addEventListener("click",phpunitCheck);
+  document.getElementById("configBtn").addEventListener("click",configCheck);
+  document.getElementById("csrfBtn").addEventListener("click",csrfCheck);
+  document.getElementById("wpBtn").addEventListener("click",wpDetect);
+
+  document.getElementById("adminBtn").addEventListener("click",()=>bruteAdmin(false));
+  document.getElementById("pauseAdminBtn").addEventListener("click",()=>pauseBrute("admin"));
+  document.getElementById("resumeAdminBtn").addEventListener("click",()=>resumeBrute("admin"));
+
+  document.getElementById("dirBtn").addEventListener("click",()=>bruteDir(false));
+  document.getElementById("pauseDirBtn").addEventListener("click",()=>pauseBrute("dir"));
+  document.getElementById("resumeDirBtn").addEventListener("click",()=>resumeBrute("dir"));
+
+  document.getElementById("subBtn").addEventListener("click",()=>bruteSub(false));
+  document.getElementById("pauseSubBtn").addEventListener("click",()=>pauseBrute("sub"));
+  document.getElementById("resumeSubBtn").addEventListener("click",()=>resumeBrute("sub"));
+
+  document.getElementById("clearHistoryBtn").addEventListener("click",clearHistory);
+
+  document.getElementById("target").addEventListener("keydown",e=>{
+    if(e.key==="Enter"){ e.preventDefault(); run(); }
+  });
+});
 </script>
 </body>
 </html>
