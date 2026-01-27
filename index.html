@@ -2,230 +2,252 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WPScan – Web Edition</title>
+<title>ORCA WebScan (WPScan-like)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-html,body{
+body{
   margin:0;
-  height:100%;
   background:#1e1e1e;
-  color:#d4d4d4;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color:#d0d0d0;
+  font-family: monospace;
 }
-#wrap{
-  display:flex;
-  flex-direction:column;
-  height:100%;
+header{
+  padding:12px 16px;
+  background:#2b2b2b;
+  border-bottom:1px solid #444;
 }
-#header{
-  padding:10px 14px;
-  background:#252526;
-  border-bottom:1px solid #333;
+input,button{
+  background:#111;
+  color:#ddd;
+  border:1px solid #555;
+  padding:6px 10px;
+  font-family: monospace;
 }
-#header span{color:#9cdcfe}
-#input{
-  padding:10px;
-  background:#1e1e1e;
-  border-bottom:1px solid #333;
-}
-#input input{
-  width:100%;
-  background:#000;
-  color:#d4d4d4;
-  border:1px solid #333;
-  padding:8px;
-  font-family:inherit;
-}
-#output{
-  flex:1;
-  padding:12px;
-  overflow:auto;
+button{cursor:pointer}
+#terminal{
+  padding:16px;
   white-space:pre-wrap;
+  font-size:13px;
+  line-height:1.4;
 }
-.green{color:#6a9955}
-.red{color:#f44747}
-.yellow{color:#dcdcaa}
-.blue{color:#9cdcfe}
-.gray{color:#808080}
+.green{color:#7CFC00}
+.red{color:#ff5c5c}
+.yellow{color:#ffcc66}
+.gray{color:#888}
 </style>
 </head>
 
 <body>
-<div id="wrap">
 
-<div id="header">
-  <span>ORCA WPScan</span> — Web Edition (read-only)
-</div>
+<header>
+  Target:
+  <input id="target" placeholder="https://example.com" size="35">
+  <button onclick="scan()">Scan</button>
+</header>
 
-<div id="input">
-  <input id="target" placeholder="https://target.com  (press Enter)">
-</div>
-
-<div id="output" id="out"></div>
-
+<div id="terminal">ORCA WebScan - WPScan style
+--------------------------------------------------
 </div>
 
 <script>
-/* ================= CORE ================= */
-const out = document.getElementById("output");
-const input = document.getElementById("target");
-
-function log(txt, cls=""){
-  const line=document.createElement("div");
-  if(cls) line.className=cls;
-  line.textContent=txt;
-  out.appendChild(line);
-  out.scrollTop=out.scrollHeight;
+/* ================= TERMINAL ================= */
+const term = document.getElementById("terminal");
+function out(t, cls=""){
+  const span=document.createElement("span");
+  if(cls) span.className=cls;
+  span.textContent=t+"\n";
+  term.appendChild(span);
+  term.scrollTop=term.scrollHeight;
 }
-function clear(){ out.innerHTML=""; }
 
-async function fetchSafe(url){
-  try{ return await fetch(url,{redirect:"manual"}); }
+/* ================= FETCH ================= */
+async function fetchSafe(u){
+  try{ return await fetch(u,{redirect:"manual"}); }
   catch{ return null; }
 }
 
 /* ================= UTIL ================= */
+function clean(url){ return url.replace(/\/$/,""); }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
-function parseVersion(v){
-  return v.split(".").map(x=>parseInt(x)||0);
+/* ================= MAIN ================= */
+async function scan(){
+  term.textContent="";
+  const base = clean(document.getElementById("target").value);
+  if(!base) return;
+
+  out("[i] ORCA WebScan starting", "gray");
+  out("[i] Target: "+base,"gray");
+  out("--------------------------------------------------");
+
+  const res = await fetchSafe(base);
+  if(!res){
+    out("[!] Target unreachable","red");
+    return;
+  }
+
+  const html = await res.text();
+
+  await serverInfo(res);
+  await wpDetect(html, res.headers);
+  await wpVersion(html, base);
+  await usersEnum(base);
+  await pluginsEnum(base);
+  await themesEnum(html);
+  await xmlrpc(base);
+  await sensitiveFiles(base);
+
+  out("--------------------------------------------------");
+  out("[+] Scan finished","green");
 }
-function cmp(a,b){
+
+/* ================= MODULES ================= */
+
+async function serverInfo(res){
+  out("[i] Server Enumeration","gray");
+  out(" | Server: "+(res.headers.get("server")||"unknown"));
+  if(res.headers.get("cf-ray")) out(" | CDN: Cloudflare");
+  out("");
+}
+
+async function wpDetect(html, headers){
+  out("[i] WordPress Detection","gray");
+  if(/wp-content|wp-includes/i.test(html)){
+    out(" [+] WordPress detected","green");
+  }else{
+    out(" [!] WordPress not detected","red");
+  }
+  if(headers.get("link")?.includes("wp-json"))
+    out(" [+] REST API detected");
+  out("");
+}
+
+async function wpVersion(html, base){
+  out("[i] WordPress Version","gray");
+  let m = html.match(/content="WordPress ([^"]+)"/i);
+  if(!m){
+    const r = await fetchSafe(base+"/feed/");
+    if(r){
+      const t = await r.text();
+      m = t.match(/wordpress.org\/\?v=([^<]+)/i);
+    }
+  }
+  if(m){
+    out(" [+] Version: "+m[1],"green");
+    autoCVE(m[1]);
+  }else{
+    out(" [-] Version not found");
+  }
+  out("");
+}
+
+/* ================= CVE AUTO MATCH ================= */
+const CVE_DB = [
+  {cve:"CVE-2022-21661", min:"5.8", max:"5.8.2", sev:"HIGH"},
+  {cve:"CVE-2023-2745", min:"6.1", max:"6.2.1", sev:"MEDIUM"},
+  {cve:"CVE-2024-31210", min:"6.3", max:"6.4.3", sev:"HIGH"}
+];
+
+function vcmp(a,b){
+  a=a.split(".").map(Number); b=b.split(".").map(Number);
   for(let i=0;i<3;i++){
-    if(a[i]>b[i]) return 1;
-    if(a[i]<b[i]) return -1;
+    if((a[i]||0)>(b[i]||0)) return 1;
+    if((a[i]||0)<(b[i]||0)) return -1;
   }
   return 0;
 }
+
 function inRange(v,min,max){
-  const pv=parseVersion(v);
-  if(min && cmp(pv,parseVersion(min))<0) return false;
-  if(max && cmp(pv,parseVersion(max))>0) return false;
+  if(min && vcmp(v,min)<0) return false;
+  if(max && vcmp(v,max)>0) return false;
   return true;
 }
 
-/* ================= CVE DB (CORE ONLY) ================= */
-const WP_CVES=[
-  {cve:"CVE-2022-21661",min:"5.8",max:"5.8.2",sev:"HIGH",desc:"WP_Query object injection"},
-  {cve:"CVE-2023-2745",min:"6.1",max:"6.2.1",sev:"MED",desc:"Stored XSS via CSRF"},
-  {cve:"CVE-2024-31210",min:"6.3",max:"6.4.3",sev:"HIGH",desc:"Password reset weakness"}
-];
-
-/* ================= SCAN ================= */
-input.addEventListener("keydown",e=>{
-  if(e.key==="Enter") scan();
-});
-
-async function scan(){
-  clear();
-  const base=input.value.replace(/\/$/,"");
-  if(!base) return;
-
-  log("[+] URL: "+base,"blue");
-  log("[+] Starting ORCA WPScan...\n","gray");
-
-  /* ---- CONNECTIVITY ---- */
-  const home=await fetchSafe(base);
-  if(!home){
-    log("[-] Target unreachable","red");
-    return;
-  }
-
-  log("[+] Target reachable","green");
-
-  const html=await home.text();
-
-  /* ---- WORDPRESS DETECT ---- */
-  if(/wp-content|wp-includes/i.test(html)){
-    log("[+] WordPress detected","green");
-  }else{
-    log("[-] WordPress not detected","red");
-    return;
-  }
-
-  /* ---- VERSION DETECT ---- */
-  let wpVersion=null;
-  let m=html.match(/content="WordPress ([^"]+)"/i);
-  if(!m){
-    const rss=await fetchSafe(base+"/feed/");
-    if(rss){
-      const t=await rss.text();
-      m=t.match(/wordpress.org\/\?v=([^<]+)/i);
+function autoCVE(v){
+  out(" [i] CVE Matching","gray");
+  let hit=false;
+  for(const c of CVE_DB){
+    if(inRange(v,c.min,c.max)){
+      out(`  [!] ${c.cve} (${c.sev})`,"yellow");
+      hit=true;
     }
   }
+  if(!hit) out("  [+] No known core CVE matched","green");
+}
 
-  if(m){
-    wpVersion=m[1];
-    log("[+] WordPress version: "+wpVersion,"green");
-  }else{
-    log("[!] WordPress version: not detected","yellow");
-  }
-
-  await sleep(200);
-
-  /* ---- USERS ENUM ---- */
-  log("\n[+] Enumerating users ...","blue");
-  let users=new Set();
+/* ================= USERS ================= */
+async function usersEnum(base){
+  out("[i] User Enumeration","gray");
+  let found=false;
   for(let i=1;i<=5;i++){
-    const r=await fetchSafe(base+"/?author="+i);
+    const r = await fetchSafe(base+"/?author="+i);
     if(r && r.url){
-      const u=r.url.match(/\/author\/([^\/]+)/);
-      if(u) users.add(u[1]);
+      const m=r.url.match(/\/author\/([^\/]+)/);
+      if(m){
+        out(" [+] User found: "+m[1],"yellow");
+        found=true;
+      }
     }
   }
-  if(users.size){
-    users.forEach(u=>{
-      log(" |__ "+u+(u==="admin"?"  <== CRITICAL":""));
-    });
-  }else{
-    log(" |__ No users found","gray");
-  }
+  if(!found) out(" [-] No users found");
+  out("");
+}
 
-  /* ---- XMLRPC ---- */
-  log("\n[+] Checking XML-RPC ...","blue");
-  const xr=await fetchSafe(base+"/xmlrpc.php");
-  if(xr && xr.status===200){
-    log(" |__ xmlrpc.php ENABLED","yellow");
-  }else{
-    log(" |__ xmlrpc.php disabled","green");
+/* ================= PLUGINS ================= */
+async function pluginsEnum(base){
+  out("[i] Plugin Enumeration","gray");
+  const plugins=["elementor","revslider","wp-file-manager"];
+  let hit=false;
+  for(const p of plugins){
+    const r = await fetchSafe(`${base}/wp-content/plugins/${p}/`);
+    if(r){
+      out(" [+] Plugin detected: "+p,"yellow");
+      hit=true;
+    }
   }
+  if(!hit) out(" [-] No common plugins found");
+  out("");
+}
 
-  /* ---- SENSITIVE FILES ---- */
-  log("\n[+] Checking sensitive files ...","blue");
+/* ================= THEMES ================= */
+async function themesEnum(html){
+  out("[i] Theme Enumeration","gray");
+  const m = html.match(/wp-content\/themes\/([^\/]+)/);
+  if(m){
+    out(" [+] Theme: "+m[1],"yellow");
+  }else{
+    out(" [-] Theme not detected");
+  }
+  out("");
+}
+
+/* ================= XMLRPC ================= */
+async function xmlrpc(base){
+  out("[i] XML-RPC","gray");
+  const r = await fetchSafe(base+"/xmlrpc.php");
+  if(r && r.status===200){
+    out(" [!] xmlrpc.php enabled","yellow");
+  }else{
+    out(" [+] xmlrpc disabled","green");
+  }
+  out("");
+}
+
+/* ================= SENSITIVE FILES ================= */
+async function sensitiveFiles(base){
+  out("[i] Sensitive Files","gray");
   const files=["/readme.html","/.env","/wp-config.php~"];
   let hit=false;
   for(const f of files){
     const r=await fetchSafe(base+f);
     if(r && r.status===200){
-      log(" |__ FOUND "+f,"red");
+      out(" [!] Exposed: "+f,"red");
       hit=true;
     }
   }
-  if(!hit) log(" |__ None found","green");
-
-  /* ---- CVE MATCH ---- */
-  log("\n[+] Enumerating known vulnerabilities ...","blue");
-  if(wpVersion){
-    let found=false;
-    for(const c of WP_CVES){
-      if(inRange(wpVersion,c.min,c.max)){
-        found=true;
-        log(
-          ` |__ ${c.cve} (${c.sev}) - ${c.desc}`,
-          c.sev==="HIGH"?"red":"yellow"
-        );
-      }
-    }
-    if(!found){
-      log(" |__ No known core CVEs found","green");
-    }
-  }else{
-    log(" |__ Version unknown, skipping CVE match","gray");
-  }
-
-  /* ---- DONE ---- */
-  log("\n[+] Scan finished","green");
+  if(!hit) out(" [+] No sensitive files exposed","green");
+  out("");
 }
 </script>
 
