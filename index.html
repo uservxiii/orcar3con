@@ -2,39 +2,53 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan – WordPress</title>
+<title>ORCA WebScan – WordPress MAX + CVE Auto-Match</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-:root{--bg:#0b1220;--panel:#121a2c;--text:#e9efff;--accent:#4f7cff}
-.light{--bg:#f4f6fb;--panel:#ffffff;--text:#0b1220;--accent:#3b6cff}
+:root{
+  --bg:#0b1220;--panel:#121a2c;--text:#e9efff;--muted:#9aa4c7;
+  --accent:#4f7cff;--danger:#ff5c5c;--warn:#ffb84d;--ok:#4dff88;
+  --radius:18px;
+}
+.light{
+  --bg:#f4f6fb;--panel:#ffffff;--text:#0b1220;--muted:#555;--accent:#3b6cff;
+}
 *{box-sizing:border-box}
 body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text);display:flex;height:100vh}
-.sidebar{width:260px;background:var(--panel);padding:20px;display:flex;flex-direction:column;gap:10px}
+.sidebar{width:270px;background:var(--panel);padding:20px;display:flex;flex-direction:column;gap:12px}
 .sidebar h2{margin:0}
-.sidebar button{padding:12px;border-radius:12px;border:none;background:var(--accent);color:#fff;cursor:pointer}
+.sidebar button{padding:12px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+.sidebar button.secondary{background:#2a3355}
 .main{flex:1;padding:24px;overflow:auto}
-.card{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:16px}
-input{width:100%;padding:12px;border-radius:10px;border:none;margin-bottom:8px}
-pre{background:#0a1020;color:#cde;padding:16px;border-radius:14px;white-space:pre-wrap}
-.light pre{background:#eef2ff;color:#111}
-small{opacity:.7}
+.card{background:var(--panel);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+input{width:100%;padding:14px;border-radius:12px;border:none;background:#0a1020;color:#fff}
+.light input{background:#eef2ff;color:#000}
+pre{background:#0a1020;padding:16px;border-radius:14px;white-space:pre-wrap;font-size:13px}
+.light pre{background:#eef2ff}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.low{background:var(--ok);color:#000}
+.medium{background:var(--warn);color:#000}
+.high{background:var(--danger)}
+small{color:var(--muted)}
+hr{border:none;border-top:1px solid #2a3355;margin:16px 0}
 </style>
 </head>
-<body>
 
+<body>
 <div class="sidebar">
   <h2>🛡️ ORCA</h2>
-  <button onclick="scan()">Scan Target</button>
-  <button onclick="rceValidate()">RCE Test</button>
-  <button onclick="toggleTheme()">🌗 Theme</button>
+  <button onclick="scan()">Full Scan</button>
+  <button class="secondary" onclick="toggleTheme()">🌗 Theme</button>
+  <small>Client-side WordPress Security Scanner</small>
 </div>
 
 <div class="main">
-  <h1>ORCA WebScan – WordPress</h1>
+  <h1>ORCA WebScan – WP MAX + CVE</h1>
 
   <div class="card">
-    <input id="target" placeholder="http://localhost">
-    <small>Enter URL</small>
+    <input id="target" placeholder="https://target.com">
+    <small>Target URL (read-only checks)</small>
   </div>
 
   <div class="card">
@@ -43,235 +57,244 @@ small{opacity:.7}
 </div>
 
 <script>
-/* ================= LOG BUFFER ================= */
-const log=[];
+/* ================= STATE ================= */
+const log=[]; let riskScore=0; let detectedWPVersion=null;
+const out=document.getElementById("out");
+const target=document.getElementById("target");
 const add=t=>log.push(t);
-const render=()=>document.getElementById("out").textContent=log.join("\n");
-const clearLog=()=>{log.length=0;};
+const render=()=>out.textContent=log.join("\n");
+const clearLog=()=>{log.length=0;riskScore=0;detectedWPVersion=null};
 
 /* ================= UI ================= */
-const target=document.getElementById("target");
-target.addEventListener("keydown",e=>{if(e.key==="Enter")scan();});
-function toggleTheme(){document.body.classList.toggle("light");}
+target.addEventListener("keydown",e=>{if(e.key==="Enter")scan()});
+function toggleTheme(){
+  document.body.classList.toggle("light");
+  localStorage.theme=document.body.classList.contains("light")?"light":"dark";
+}
+if(localStorage.theme==="light") document.body.classList.add("light");
 
-/* ================= SAFE FETCH ================= */
-async function fetchSafe(u){
-  try{return await fetch(u,{redirect:"manual"});}catch{return null;}
+/* ================= FETCH ================= */
+async function fetchSafe(u){ try{return await fetch(u,{redirect:"manual"})}catch{return null} }
+
+/* ================= HELPERS ================= */
+function risk(level){
+  if(level==="HIGH") riskScore+=3;
+  if(level==="MED") riskScore+=2;
+  if(level==="LOW") riskScore+=1;
+  return level==="HIGH"?"[HIGH]":level==="MED"?"[MED]":"[LOW]";
+}
+function isWordPress(html, headers){
+  if(/wp-content|wp-includes|wp-emoji/i.test(html)) return true;
+  if(headers.get("link")?.includes("wp-json")) return true;
+  if(headers.get("x-powered-by")?.toLowerCase().includes("wordpress")) return true;
+  return false;
+}
+function parseVersion(v){
+  // returns array [major, minor, patch]
+  return v.split(".").map(x=>parseInt(x,10)||0);
+}
+function cmpVersion(a,b){
+  // a,b arrays
+  for(let i=0;i<3;i++){ if(a[i]>b[i]) return 1; if(a[i]<b[i]) return -1; }
+  return 0;
+}
+function inRange(v, min, max){
+  const pv=parseVersion(v);
+  if(min && cmpVersion(pv, parseVersion(min))<0) return false;
+  if(max && cmpVersion(pv, parseVersion(max))>0) return false;
+  return true;
 }
 
-/* ================= PLUGIN FINGERPRINT ================= */
-const pluginFingerprints=[
-  {plugin:"revslider",path:"/wp-content/plugins/revslider/",cves:["CVE-2014-9734"],risk:"HIGH"},
-  {plugin:"wp-file-manager",path:"/wp-content/plugins/wp-file-manager/",cves:["CVE-2020-25213"],risk:"HIGH"},
-  {plugin:"elementor",path:"/wp-content/plugins/elementor/",cves:["CVE-2023-48777"],risk:"MEDIUM"}
+/* ================= CVE DATABASE (CURATED) =================
+   NOTE: ringkas & aman (contoh representatif). Mudah kamu extend.
+*/
+const WP_CVE_DB = [
+  {
+    cve:"CVE-2022-21661",
+    title:"WP Object Injection via WP_Query",
+    min:"5.8", max:"5.8.2",
+    severity:"HIGH",
+    impact:"Object injection leading to DoS / potential RCE in specific contexts"
+  },
+  {
+    cve:"CVE-2022-3590",
+    title:"Unprotected REST Endpoint Data Exposure",
+    min:"6.0", max:"6.0.2",
+    severity:"MED",
+    impact:"Information disclosure via REST API"
+  },
+  {
+    cve:"CVE-2023-2745",
+    title:"CSRF to Stored XSS (Core)",
+    min:"6.1", max:"6.2.1",
+    severity:"MED",
+    impact:"Stored XSS via crafted requests"
+  },
+  {
+    cve:"CVE-2024-31210",
+    title:"Password Reset Token Weakness",
+    min:"6.3", max:"6.4.3",
+    severity:"HIGH",
+    impact:"Account takeover in certain configurations"
+  }
 ];
-const cveDB={
-  "CVE-2014-9734":"RevSlider arbitrary file upload → RCE",
-  "CVE-2020-25213":"WP File Manager unauthenticated RCE",
-  "CVE-2023-48777":"Elementor template import RCE"
-};
 
-/* ================= MAIN SCAN ================= */
+/* ================= MAIN ================= */
 async function scan(){
   clearLog();
   const base=target.value.replace(/\/$/,"");
   if(!base) return;
 
-  add("Scanning: "+base+"\n");
-  render();
+  add("🔍 Scanning: "+base+"\n"); render();
 
   const home=await fetchSafe(base);
-  if(!home){add("Target unreachable");render();return;}
+  if(!home){ add("❌ Target unreachable"); render(); return; }
   const html=await home.text();
 
-  add("Server / CDN");
-  add(home.headers.get("server")||"hidden");
-  if(home.headers.get("cf-ray")) add("Cloudflare detected");
+  add("== Server Info ==");
+  add("Server: "+(home.headers.get("server")||"hidden"));
+  if(home.headers.get("cf-ray")) add("CDN: Cloudflare");
   add("");
 
-  add("WordPress detected: "+(/wp-content|wp-includes/i.test(html)?"YES":"NO"));
+  const wp=isWordPress(html, home.headers);
+  add("WordPress: "+(wp?"YES":"NO"));
   add("");
 
-  await enumUsers(base);   // Admin-priority
-  await pluginScan(base);
+  if(wp){
+    await wpVersionDetect(base, html);
+    await wpCVEAutoMatch();
+    await userEnum(base);
+    await pluginScan(base);
+    await themeDetect(html);
+    await sensitiveFiles(base);
+    await headerAudit(home.headers);
+    await xmlrpcCheck(base);
+    await restExposure(base);
+  }
 
+  add("\n== FINAL RISK SCORE ==");
+  add("Score: "+riskScore);
+  add(riskScore>=10?"⚠️ HIGH RISK":riskScore>=5?"⚠️ MEDIUM RISK":"✅ LOW RISK");
   add("\nScan completed.");
   render();
 }
 
-/* ================= USER ENUM (Admin Priority) ================= */
-async function enumUsers(base){
-  add("User Enumeration");
-  let users=new Set();
-  let adminFound=false;
-
-  // REST API
-  const api=await fetchSafe(base+"/wp-json/wp/v2/users");
-  if(api && api.status===200){
-    try{
-      const j=await api.json();
-      j.forEach(u=>{
-        users.add(u.slug);
-        if(u.slug.toLowerCase()==="admin") adminFound=true;
-      });
-    }catch{}
+/* ================= MODULES ================= */
+async function wpVersionDetect(base, html){
+  add("== WordPress Version ==");
+  let v = html.match(/content="WordPress ([^"]+)"/i);
+  if(!v){
+    // fallback via RSS
+    const rss = await fetchSafe(base+"/feed/");
+    if(rss && rss.status===200){
+      const t = await rss.text();
+      v = t.match(/generator>https:\/\/wordpress.org\/\?v=([^<]+)/i);
+    }
   }
+  if(v){
+    detectedWPVersion = v[1];
+    add("Version: "+detectedWPVersion+" "+risk("MED"));
+  }else{
+    add("Version hidden (CVE auto-match skipped)");
+  }
+  add("");
+}
 
-  // Author enum
-  for(let i=1;i<=10;i++){
+async function wpCVEAutoMatch(){
+  add("== CVE Auto-Match (by Version) ==");
+  if(!detectedWPVersion){
+    add("No version → cannot auto-match CVE");
+    add("");
+    return;
+  }
+  let hits=0;
+  WP_CVE_DB.forEach(c=>{
+    if(inRange(detectedWPVersion, c.min, c.max)){
+      add(`${c.cve} ${risk(c.severity)}`);
+      add(` ↳ ${c.title}`);
+      add(` ↳ Impact: ${c.impact}`);
+      hits++;
+    }
+  });
+  if(hits===0) add("No known core CVE matched for this version");
+  add("");
+}
+
+async function userEnum(base){
+  add("== User Enumeration ==");
+  let found=false;
+  for(let i=1;i<=5;i++){
     const r=await fetchSafe(base+"/?author="+i);
     if(r && r.url){
       const m=r.url.match(/\/author\/([^\/]+)/);
       if(m){
-        users.add(m[1]);
-        if(m[1].toLowerCase()==="admin") adminFound=true;
-      }
-    }
-  }
-
-  if(adminFound) add("User: admin ⚠️ (PRIORITY)");
-  users.forEach(u=>{
-    if(u.toLowerCase()!=="admin") add("User: "+u);
-  });
-  if(users.size===0) add("No users discovered");
-  add("");
-  render();
-}
-
-/* ================= PLUGIN SCAN ================= */
-async function pluginScan(base){
-  add("Plugin RCE Fingerprint");
-  let found=false;
-  for(const p of pluginFingerprints){
-    const r=await fetchSafe(base+p.path);
-    if(!r) continue;
-    found=true;
-    add("Plugin : "+p.plugin);
-    add("Path   : "+p.path);
-    add("Risk   : "+p.risk);
-    add("CVE    : "+p.cves.join(", "));
-    p.cves.forEach(c=>add(" ↳ "+c+" : "+cveDB[c]));
-    add("");
-  }
-  if(!found) add("No vulnerable plugin detected\n");
-}
-
-/* ================= RCE REAL ================= */
-async function rceValidate(){
-  const base=target.value.replace(/\/$/,"");
-  if(!base) return;
-
-  add("\nRCE Test");
-  const tests=["/?cmd=id","/?exec=whoami","/wp-admin/admin-ajax.php?action=test"];
-  let score=0;
-
-  for(const t of tests){
-    try{
-      const r=await fetch(base+t);
-      const txt=await r.text();
-      if(/uid=|gid=|root:/i.test(txt)){
-        add(t+" → EXECUTION SUCCESS [HIGH]");
-        score+=3;
-      }else if(/warning|fatal error/i.test(txt)){
-        add(t+" → ERROR LEAK [MEDIUM]");
-        score+=2;
-      }else{
-        add(t+" → RESPONSE OK");
-      }
-    }catch{
-      add(t+" → BLOCKED / FAILED");
-    }
-  }
-
-  add("\nResult");
-  add(score>=5?"LIKELY RCE (HIGH)":
-      score>=2?"POTENTIAL (MEDIUM)":
-      "No RCE indication (LOW)");
-  render();
-}
-</script>
-  <script>
-/* ================= ORCA UPGRADE PATCH ================= */
-
-/* ---- STRONG WORDPRESS DETECTION ---- */
-function isWordPress(html, headers){
-  if(/wp-content|wp-includes|wp-emoji/i.test(html)) return true;
-  if(headers.get("x-powered-by")?.toLowerCase().includes("wordpress")) return true;
-  if(headers.get("link")?.includes("wp-json")) return true;
-  return false;
-}
-
-/* ---- ADMIN ENUM VIA WP JSON (VALID) ---- */
-async function enumUsersWPJSON(base){
-  add("WP JSON User Enumeration (Enhanced)");
-
-  const endpoints=[
-    "/wp-json/wp/v2/users",
-    "/wp-json/wp/v2/users?context=edit",
-    "/wp-json/wp/v2/users/me"
-  ];
-
-  let found=false;
-
-  for(const ep of endpoints){
-    const r=await fetchSafe(base+ep);
-    if(!r || r.status!==200) continue;
-
-    try{
-      const data=await r.json();
-      const users=Array.isArray(data)?data:[data];
-
-      users.forEach(u=>{
-        const name=u.slug||u.name||"unknown";
-        const roles=u.roles||[];
-        if(roles.includes("administrator")){
-          add("ADMIN FOUND : "+name+" ⚠️⚠️⚠️");
-        }else{
-          add("User : "+name);
-        }
+        add("User: "+m[1]+" "+(m[1]==="admin"?risk("HIGH"):""));
         found=true;
-      });
-    }catch{}
+      }
+    }
   }
-
-  if(!found) add("WP JSON protected or no users exposed");
+  if(!found) add("No users exposed");
   add("");
-  render();
 }
 
-/* ---- WRAP ORIGINAL SCAN (NO EDIT) ---- */
-const originalScan = scan;
-scan = async function(){
-  clearLog();
-  const base=target.value.replace(/\/$/,"");
-  if(!base) return;
-
-  add("Scanning: "+base+"\n");
-  render();
-
-  const home=await fetchSafe(base);
-  if(!home){add("Target unreachable");render();return;}
-  const html=await home.text();
-
-  add("Server / CDN");
-  add(home.headers.get("server")||"hidden");
-  add("");
-
-  const wp=isWordPress(html, home.headers);
-  add("WordPress detected: "+(wp?"YES ✅":"NO ❌"));
-  add("");
-
-  if(wp){
-    await enumUsersWPJSON(base);   // 🔥 ADMIN PRIORITY
+async function pluginScan(base){
+  add("== Plugin Fingerprint ==");
+  const plugins=[
+    {n:"revslider",p:"/wp-content/plugins/revslider/",r:"HIGH"},
+    {n:"wp-file-manager",p:"/wp-content/plugins/wp-file-manager/",r:"HIGH"},
+    {n:"elementor",p:"/wp-content/plugins/elementor/",r:"MED"}
+  ];
+  let any=false;
+  for(const x of plugins){
+    const r=await fetchSafe(base+x.p);
+    if(r){ add("Plugin: "+x.n+" "+risk(x.r)); any=true; }
   }
+  if(!any) add("No known plugins detected");
+  add("");
+}
 
-  await pluginScan(base);
-  add("\nScan completed.");
-  render();
-};
+async function themeDetect(html){
+  add("== Theme Detection ==");
+  const m=html.match(/wp-content\/themes\/([^\/]+)/i);
+  if(m){ add("Theme: "+m[1]+" "+risk("LOW")); }
+  else add("Theme hidden");
+  add("");
+}
 
-/* ================= END PATCH ================= */
+async function sensitiveFiles(base){
+  add("== Sensitive Files ==");
+  const files=["/readme.html","/wp-config.php~","/wp-config.bak","/.env"];
+  let hit=false;
+  for(const f of files){
+    const r=await fetchSafe(base+f);
+    if(r && r.status===200){ add("Exposed: "+f+" "+risk("HIGH")); hit=true; }
+  }
+  if(!hit) add("No sensitive files exposed");
+  add("");
+}
+
+async function headerAudit(h){
+  add("== Security Headers ==");
+  const checks=[["x-frame-options","MED"],["content-security-policy","MED"],["x-content-type-options","LOW"],["referrer-policy","LOW"]];
+  checks.forEach(c=>{ if(!h.get(c[0])) add("Missing: "+c[0]+" "+risk(c[1])); });
+  add("");
+}
+
+async function xmlrpcCheck(base){
+  add("== XML-RPC ==");
+  const r=await fetchSafe(base+"/xmlrpc.php");
+  if(r && r.status===200) add("xmlrpc.php enabled "+risk("MED"));
+  else add("XML-RPC disabled");
+  add("");
+}
+
+async function restExposure(base){
+  add("== REST API Exposure ==");
+  const r=await fetchSafe(base+"/wp-json/wp/v2/users");
+  if(r && r.status===200) add("Users endpoint exposed "+risk("MED"));
+  else add("REST users protected");
+  add("");
+}
 </script>
-
 </body>
 </html>
