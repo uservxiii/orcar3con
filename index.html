@@ -1,253 +1,107 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>ORCA WebScan (WPScan-like)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+<title>ORCA WebScan (Admin Enum FIX)</title>
 <style>
-body{
-  margin:0;
-  background:#1e1e1e;
-  color:#d0d0d0;
-  font-family: monospace;
-}
-header{
-  padding:12px 16px;
-  background:#2b2b2b;
-  border-bottom:1px solid #444;
-}
-input,button{
-  background:#111;
-  color:#ddd;
-  border:1px solid #555;
-  padding:6px 10px;
-  font-family: monospace;
-}
-button{cursor:pointer}
-#terminal{
-  padding:16px;
-  white-space:pre-wrap;
-  font-size:13px;
-  line-height:1.4;
-}
+body{background:#1e1e1e;color:#d0d0d0;font-family:monospace}
+#t{white-space:pre-wrap;padding:16px}
+input,button{background:#111;color:#ddd;border:1px solid #555;padding:5px}
 .green{color:#7CFC00}
-.red{color:#ff5c5c}
 .yellow{color:#ffcc66}
+.red{color:#ff5c5c}
 .gray{color:#888}
 </style>
 </head>
-
 <body>
 
-<header>
-  Target:
-  <input id="target" placeholder="https://example.com" size="35">
-  <button onclick="scan()">Scan</button>
-</header>
+Target:
+<input id="target" placeholder="https://example.com" size="35">
+<button onclick="scan()">Scan</button>
 
-<div id="terminal">ORCA WebScan - WPScan style
---------------------------------------------------
+<div id="t">ORCA – Admin Enumeration FIX
+----------------------------------
 </div>
 
 <script>
-/* ================= TERMINAL ================= */
-const term = document.getElementById("terminal");
-function out(t, cls=""){
-  const span=document.createElement("span");
-  if(cls) span.className=cls;
-  span.textContent=t+"\n";
-  term.appendChild(span);
-  term.scrollTop=term.scrollHeight;
-}
+const t=document.getElementById("t");
+const log=(m,c="")=>{
+  const s=document.createElement("span");
+  if(c) s.className=c;
+  s.textContent=m+"\n";
+  t.appendChild(s);
+};
 
-/* ================= FETCH ================= */
 async function fetchSafe(u){
-  try{ return await fetch(u,{redirect:"manual"}); }
-  catch{ return null; }
+  try{return await fetch(u,{redirect:"manual"})}catch{return null}
 }
 
-/* ================= UTIL ================= */
-function clean(url){ return url.replace(/\/$/,""); }
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function clean(u){return u.replace(/\/$/,"")}
 
-/* ================= MAIN ================= */
 async function scan(){
-  term.textContent="";
-  const base = clean(document.getElementById("target").value);
+  t.textContent="";
+  const base=clean(document.getElementById("target").value);
   if(!base) return;
 
-  out("[i] ORCA WebScan starting", "gray");
-  out("[i] Target: "+base,"gray");
-  out("--------------------------------------------------");
-
-  const res = await fetchSafe(base);
-  if(!res){
-    out("[!] Target unreachable","red");
-    return;
-  }
-
-  const html = await res.text();
-
-  await serverInfo(res);
-  await wpDetect(html, res.headers);
-  await wpVersion(html, base);
-  await usersEnum(base);
-  await pluginsEnum(base);
-  await themesEnum(html);
-  await xmlrpc(base);
-  await sensitiveFiles(base);
-
-  out("--------------------------------------------------");
-  out("[+] Scan finished","green");
+  log("[i] Starting admin enumeration","gray");
+  await enumUsers(base);
+  log("[+] Done","green");
 }
 
-/* ================= MODULES ================= */
-
-async function serverInfo(res){
-  out("[i] Server Enumeration","gray");
-  out(" | Server: "+(res.headers.get("server")||"unknown"));
-  if(res.headers.get("cf-ray")) out(" | CDN: Cloudflare");
-  out("");
-}
-
-async function wpDetect(html, headers){
-  out("[i] WordPress Detection","gray");
-  if(/wp-content|wp-includes/i.test(html)){
-    out(" [+] WordPress detected","green");
-  }else{
-    out(" [!] WordPress not detected","red");
-  }
-  if(headers.get("link")?.includes("wp-json"))
-    out(" [+] REST API detected");
-  out("");
-}
-
-async function wpVersion(html, base){
-  out("[i] WordPress Version","gray");
-  let m = html.match(/content="WordPress ([^"]+)"/i);
-  if(!m){
-    const r = await fetchSafe(base+"/feed/");
-    if(r){
-      const t = await r.text();
-      m = t.match(/wordpress.org\/\?v=([^<]+)/i);
-    }
-  }
-  if(m){
-    out(" [+] Version: "+m[1],"green");
-    autoCVE(m[1]);
-  }else{
-    out(" [-] Version not found");
-  }
-  out("");
-}
-
-/* ================= CVE AUTO MATCH ================= */
-const CVE_DB = [
-  {cve:"CVE-2022-21661", min:"5.8", max:"5.8.2", sev:"HIGH"},
-  {cve:"CVE-2023-2745", min:"6.1", max:"6.2.1", sev:"MEDIUM"},
-  {cve:"CVE-2024-31210", min:"6.3", max:"6.4.3", sev:"HIGH"}
-];
-
-function vcmp(a,b){
-  a=a.split(".").map(Number); b=b.split(".").map(Number);
-  for(let i=0;i<3;i++){
-    if((a[i]||0)>(b[i]||0)) return 1;
-    if((a[i]||0)<(b[i]||0)) return -1;
-  }
-  return 0;
-}
-
-function inRange(v,min,max){
-  if(min && vcmp(v,min)<0) return false;
-  if(max && vcmp(v,max)>0) return false;
-  return true;
-}
-
-function autoCVE(v){
-  out(" [i] CVE Matching","gray");
-  let hit=false;
-  for(const c of CVE_DB){
-    if(inRange(v,c.min,c.max)){
-      out(`  [!] ${c.cve} (${c.sev})`,"yellow");
-      hit=true;
-    }
-  }
-  if(!hit) out("  [+] No known core CVE matched","green");
-}
-
-/* ================= USERS ================= */
-async function usersEnum(base){
-  out("[i] User Enumeration","gray");
+/* ================= REAL ADMIN ENUM ================= */
+async function enumUsers(base){
+  log("[i] Enumerating users (admin priority)","gray");
   let found=false;
-  for(let i=1;i<=5;i++){
-    const r = await fetchSafe(base+"/?author="+i);
-    if(r && r.url){
-      const m=r.url.match(/\/author\/([^\/]+)/);
+
+  /* 1️⃣ REST API users */
+  const r=await fetchSafe(base+"/wp-json/wp/v2/users?per_page=100");
+  if(r && r.status===200){
+    try{
+      const users=await r.json();
+      users.forEach(u=>{
+        const name=u.slug||u.name;
+        if(name){
+          if(name.toLowerCase()==="admin"){
+            log(" [!] ADMIN FOUND: "+name,"red");
+          }else{
+            log(" [+] User: "+name,"yellow");
+          }
+          found=true;
+        }
+      });
+    }catch{}
+  }
+
+  /* 2️⃣ REST users/me (kadang bocor role) */
+  const me=await fetchSafe(base+"/wp-json/wp/v2/users/me");
+  if(me && me.status===200){
+    try{
+      const u=await me.json();
+      if(u.slug){
+        log(" [!] users/me exposed: "+u.slug,"red");
+        found=true;
+      }
+    }catch{}
+  }
+
+  /* 3️⃣ Author enumeration */
+  for(let i=1;i<=10;i++){
+    const a=await fetchSafe(base+"/?author="+i);
+    if(a && a.url){
+      const m=a.url.match(/\/author\/([^\/]+)/);
       if(m){
-        out(" [+] User found: "+m[1],"yellow");
+        const name=m[1];
+        if(name.toLowerCase()==="admin"){
+          log(" [!] ADMIN FOUND (author): "+name,"red");
+        }else{
+          log(" [+] User (author): "+name,"yellow");
+        }
         found=true;
       }
     }
   }
-  if(!found) out(" [-] No users found");
-  out("");
-}
 
-/* ================= PLUGINS ================= */
-async function pluginsEnum(base){
-  out("[i] Plugin Enumeration","gray");
-  const plugins=["elementor","revslider","wp-file-manager"];
-  let hit=false;
-  for(const p of plugins){
-    const r = await fetchSafe(`${base}/wp-content/plugins/${p}/`);
-    if(r){
-      out(" [+] Plugin detected: "+p,"yellow");
-      hit=true;
-    }
-  }
-  if(!hit) out(" [-] No common plugins found");
-  out("");
-}
-
-/* ================= THEMES ================= */
-async function themesEnum(html){
-  out("[i] Theme Enumeration","gray");
-  const m = html.match(/wp-content\/themes\/([^\/]+)/);
-  if(m){
-    out(" [+] Theme: "+m[1],"yellow");
-  }else{
-    out(" [-] Theme not detected");
-  }
-  out("");
-}
-
-/* ================= XMLRPC ================= */
-async function xmlrpc(base){
-  out("[i] XML-RPC","gray");
-  const r = await fetchSafe(base+"/xmlrpc.php");
-  if(r && r.status===200){
-    out(" [!] xmlrpc.php enabled","yellow");
-  }else{
-    out(" [+] xmlrpc disabled","green");
-  }
-  out("");
-}
-
-/* ================= SENSITIVE FILES ================= */
-async function sensitiveFiles(base){
-  out("[i] Sensitive Files","gray");
-  const files=["/readme.html","/.env","/wp-config.php~"];
-  let hit=false;
-  for(const f of files){
-    const r=await fetchSafe(base+f);
-    if(r && r.status===200){
-      out(" [!] Exposed: "+f,"red");
-      hit=true;
-    }
-  }
-  if(!hit) out(" [+] No sensitive files exposed","green");
-  out("");
+  if(!found) log(" [-] No users exposed","green");
 }
 </script>
 
