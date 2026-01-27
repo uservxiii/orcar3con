@@ -1,109 +1,203 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ORCA WPScan</title>
+<title>ORCA WPScan Web – LAB</title>
 <style>
-body{background:#1e1e1e;color:#d0d0d0;font-family:monospace}
-#t{white-space:pre-wrap;padding:16px}
-input,button{background:#111;color:#ddd;border:1px solid #555;padding:5px}
-.green{color:#7CFC00}
-.yellow{color:#ffcc66}
-.red{color:#ff5c5c}
-.gray{color:#888}
+body{background:#1e1e1e;color:#d4d4d4;font-family:monospace}
+#wrap{max-width:1100px;margin:auto;padding:10px}
+input,button{background:#111;color:#eee;border:1px solid #555;padding:6px}
+pre{white-space:pre-wrap}
+.h{color:#ff5555}
+.m{color:#ffcc66}
+.l{color:#7CFC00}
+.i{color:#9cdcfe}
 </style>
 </head>
 <body>
-
+<div id="wrap">
 Target:
-<input id="target" placeholder="https://example.com" size="35">
-<button onclick="scan()">Scan</button>
-
-<div id="t">ORCA – Admin Enumeration FIX
-----------------------------------
+<input id="t" size="40" placeholder="http://lab.wp">
+<button onclick="scan()">SCAN</button>
+<pre id="o">ORCA WPScan Web – LAB MODE
+=========================================
+</pre>
 </div>
 
 <script>
-const t=document.getElementById("t");
-const log=(m,c="")=>{
-  const s=document.createElement("span");
-  if(c) s.className=c;
-  s.textContent=m+"\n";
-  t.appendChild(s);
-};
-
-async function fetchSafe(u){
-  try{return await fetch(u,{redirect:"manual"})}catch{return null}
+const O=document.getElementById("o");
+const log=(m,c="i")=>{
+ const s=document.createElement("span");
+ s.className=c; s.textContent=m+"\n"; O.appendChild(s);
 }
+const clr=()=>O.textContent="";
+const f=async(u,o={})=>{try{return await fetch(u,o)}catch{return null}}
+const clean=u=>u.replace(/\/$/,"");
 
-function clean(u){return u.replace(/\/$/,"")}
-
+/* ================= MAIN ================= */
 async function scan(){
-  t.textContent="";
-  const base=clean(document.getElementById("target").value);
-  if(!base) return;
+ clr();
+ const b=clean(document.getElementById("t").value);
+ if(!b) return;
 
-  log("[i] Starting admin enumeration","gray");
-  await enumUsers(base);
-  log("[+] Done","green");
+ log("[*] Target : "+b);
+ await detectWP(b);
+ await wpVersion(b);
+ await headers(b);
+ await themes(b);
+ await plugins(b);
+ await users(b);
+ await endpoints(b);
+ await files(b);
+ log("\n[+] Scan finished","l");
 }
 
-/* ================= REAL ADMIN ENUM ================= */
-async function enumUsers(base){
-  log("[i] Enumerating users (admin priority)","gray");
-  let found=false;
+/* ================= WP DETECTION ================= */
+async function detectWP(b){
+ log("\n[+] WordPress Detection");
+ const r=await f(b);
+ if(!r){log(" unreachable","h");return;}
+ const t=await r.text();
+ if(/wp-content|wp-includes|wp-emoji/i.test(t))
+  log(" WordPress detected","l");
+ else
+  log(" Not WordPress","h");
+}
 
-  /* 1️⃣ REST API users */
-  const r=await fetchSafe(base+"/wp-json/wp/v2/users?per_page=100");
-  if(r && r.status===200){
-    try{
-      const users=await r.json();
-      users.forEach(u=>{
-        const name=u.slug||u.name;
-        if(name){
-          if(name.toLowerCase()==="admin"){
-            log(" [!] ADMIN FOUND: "+name,"red");
-          }else{
-            log(" [+] User: "+name,"yellow");
-          }
-          found=true;
-        }
-      });
-    }catch{}
+/* ================= VERSION ================= */
+async function wpVersion(b){
+ log("\n[+] WordPress Version");
+ const r=await f(b);
+ if(r){
+  const t=await r.text();
+  const g=t.match(/WordPress\s([\d.]+)/i);
+  if(g) log(" Version (meta): "+g[1],"m");
+ }
+ const rd=await f(b+"/readme.html");
+ if(rd && rd.status===200){
+  const t=await rd.text();
+  const v=t.match(/Version\s([\d.]+)/);
+  if(v) log(" Version (readme): "+v[1],"h");
+ }
+ const rss=await f(b+"/?feed=rss2");
+ if(rss){
+  const t=await rss.text();
+  const v=t.match(/generator.+wordpress.org\/\?v=([\d.]+)/i);
+  if(v) log(" Version (RSS): "+v[1],"m");
+ }
+}
+
+/* ================= HEADERS ================= */
+async function headers(b){
+ log("\n[+] HTTP Headers");
+ const r=await f(b);
+ if(!r) return;
+ ["server","x-powered-by","x-generator"].forEach(h=>{
+  const v=r.headers.get(h);
+  if(v) log(` ${h}: ${v}`,"i");
+ });
+}
+
+/* ================= THEME ================= */
+async function themes(b){
+ log("\n[+] Theme Enumeration");
+ const r=await f(b);
+ if(!r) return;
+ const t=await r.text();
+ const m=[...t.matchAll(/themes\/([^\/]+)\//g)];
+ if(!m.length) log(" none found","m");
+ [...new Set(m.map(x=>x[1]))].forEach(x=>{
+  log(" Theme: "+x,"m");
+ });
+}
+
+/* ================= PLUGINS ================= */
+async function plugins(b){
+ log("\n[+] Plugin Enumeration (Passive)");
+ const r=await f(b);
+ if(!r) return;
+ const t=await r.text();
+ const m=[...t.matchAll(/plugins\/([^\/]+)\//g)];
+ if(!m.length){log(" none detected","m");return;}
+ [...new Set(m.map(x=>x[1]))].forEach(p=>{
+  log(" Plugin: "+p,"l");
+ });
+}
+
+/* ================= USER ENUM ================= */
+async function users(b){
+ log("\n[+] User Enumeration (ADMIN PRIORITY)");
+
+ // REST
+ const r=await f(b+"/wp-json/wp/v2/users");
+ if(r && r.status===200){
+  const j=await r.json();
+  j.forEach(u=>{
+   if(u.slug==="admin")
+    log(" ADMIN exposed via REST","h");
+   else
+    log(" User: "+u.slug,"m");
+  });
+ }
+
+ // author redirect
+ for(let i=1;i<=10;i++){
+  const a=await f(b+"/?author="+i,{redirect:"manual"});
+  const l=a?.headers.get("location");
+  if(l){
+   const m=l.match(/author\/([^\/]+)/);
+   if(m){
+    if(m[1]==="admin")
+     log(" ADMIN via author enum","h");
+    else
+     log(" User via author: "+m[1],"m");
+   }
   }
+ }
 
-  /* 2️⃣ REST users/me (kadang bocor role) */
-  const me=await fetchSafe(base+"/wp-json/wp/v2/users/me");
-  if(me && me.status===200){
-    try{
-      const u=await me.json();
-      if(u.slug){
-        log(" [!] users/me exposed: "+u.slug,"red");
-        found=true;
-      }
-    }catch{}
-  }
+ // sitemap users
+ const s=await f(b+"/wp-sitemap-users-1.xml");
+ if(s && s.status===200){
+  const t=await s.text();
+  [...t.matchAll(/author\/([^\/<]+)/g)].forEach(m=>{
+   log(" User via sitemap: "+m[1],"m");
+  });
+ }
+}
 
-  /* 3️⃣ Author enumeration */
-  for(let i=1;i<=10;i++){
-    const a=await fetchSafe(base+"/?author="+i);
-    if(a && a.url){
-      const m=a.url.match(/\/author\/([^\/]+)/);
-      if(m){
-        const name=m[1];
-        if(name.toLowerCase()==="admin"){
-          log(" [!] ADMIN FOUND (author): "+name,"red");
-        }else{
-          log(" [+] User (author): "+name,"yellow");
-        }
-        found=true;
-      }
-    }
-  }
+/* ================= ENDPOINTS ================= */
+async function endpoints(b){
+ log("\n[+] Security Endpoints");
 
-  if(!found) log(" [-] No users exposed","green");
+ const list=[
+  ["/xmlrpc.php","XML-RPC enabled","h"],
+  ["/wp-admin/","wp-admin reachable","i"],
+  ["/wp-json/","REST API open","m"],
+  ["/wp-login.php","Login page exposed","i"]
+ ];
+ for(const e of list){
+  const r=await f(b+e[0]);
+  if(r && r.status===200)
+   log(" "+e[1]," "+e[2]);
+ }
+}
+
+/* ================= FILE LEAK ================= */
+async function files(b){
+ log("\n[+] Sensitive Files");
+ const fz=[
+  "/wp-config.php~",
+  "/.env",
+  "/backup.zip",
+  "/wp-content/uploads/",
+  "/.git/"
+ ];
+ for(const p of fz){
+  const r=await f(b+p);
+  if(r && r.status===200)
+   log(" Exposed: "+p,"h");
+ }
 }
 </script>
-
 </body>
 </html>
